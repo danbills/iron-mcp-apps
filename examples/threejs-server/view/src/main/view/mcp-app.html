@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <title>Three.js View</title>
+</head>
+<body>
+  <div class="threejs-container" id="container">
+    <div class="shimmer-container" id="shimmer" style="display: none;">
+      <div class="shimmer-title">Three.js</div>
+      <pre class="shimmer-code" id="shimmer-code"></pre>
+    </div>
+    <canvas id="threejs-canvas" style="display: block; width: 100%; border-radius: 8px;"></canvas>
+    <div class="error-overlay" id="error-overlay" style="display: none;"></div>
+    <button id="fullscreen-btn" class="fullscreen-btn" title="Toggle fullscreen">
+      <svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+      </svg>
+      <svg class="collapse-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>
+      </svg>
+    </button>
+  </div>
+  <!-- mcp-app-script -->
+</body>
+</html>
