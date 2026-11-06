@@ -104,6 +104,9 @@ lazy val cohortServer      = server("cohort", "cohort-heatmap-server", cohortVie
 lazy val segmentationModel  = model("segmentation", "customer-segmentation-server")
 lazy val segmentationView   = view("segmentation", "customer-segmentation-server").dependsOn(segmentationModel.js, chartjs)
 lazy val segmentationServer = server("segmentation", "customer-segmentation-server", segmentationView).dependsOn(segmentationModel.jvm)
+lazy val scenarioModel     = model("scenario", "scenario-modeler-server")
+lazy val scenarioView      = view("scenario", "scenario-modeler-server").dependsOn(scenarioModel.js, chartjs)
+lazy val scenarioServer    = server("scenario", "scenario-modeler-server", scenarioView).dependsOn(scenarioModel.jvm)
 lazy val debugView         = view("debug", "debug-server")
 lazy val debugServer       = server("debug", "debug-server", debugView)
 lazy val integrationView   = view("integration", "integration-server")
@@ -118,10 +121,10 @@ lazy val qrServer          = server("qr", "qr-server", qrView).settings(
 lazy val videoView         = view("video", "video-resource-server")
 lazy val videoServer       = server("video", "video-resource-server", videoView)
 
-lazy val exampleServers = Seq(basicServer, budgetServer, cohortServer, segmentationServer, debugServer, integrationServer, qrServer, quickstartServer, videoServer)
-lazy val exampleViews   = Seq(basicView, budgetView, cohortView, segmentationView, debugView, integrationView, qrView, quickstartView, videoView)
+lazy val exampleServers = Seq(basicServer, budgetServer, cohortServer, segmentationServer, debugServer, scenarioServer, integrationServer, qrServer, quickstartServer, videoServer)
+lazy val exampleViews   = Seq(basicView, budgetView, cohortView, segmentationView, debugView, scenarioView, integrationView, qrView, quickstartView, videoView)
 lazy val facades: Seq[ProjectReference] = Seq(chartjs)
-lazy val models: Seq[ProjectReference]  = Seq(budgetModel.jvm, budgetModel.js, cohortModel.jvm, cohortModel.js, segmentationModel.jvm, segmentationModel.js)
+lazy val models: Seq[ProjectReference]  = Seq(budgetModel.jvm, budgetModel.js, cohortModel.jvm, cohortModel.js, segmentationModel.jvm, segmentationModel.js, scenarioModel.jvm, scenarioModel.js)
 lazy val examples: Seq[ProjectReference] = (exampleServers ++ exampleViews).map(p => p: ProjectReference) ++ facades ++ models
 
 // Every server in one JVM, as upstream's run-all.ts does, for basic-host and the e2e suite.
