@@ -46,6 +46,10 @@ lazy val chartjs = (project in file("facades/chartjs"))
   .enablePlugins(ScalaJSPlugin)
   .settings(name := "facade-chartjs", libraryDependencies += "org.scala-js" %% "scalajs-dom" % "2.8.1")
 
+lazy val abcjs = (project in file("facades/abcjs"))
+  .enablePlugins(ScalaJSPlugin)
+  .settings(name := "facade-abcjs", libraryDependencies += "org.scala-js" %% "scalajs-dom" % "2.8.1")
+
 /** Types an example's server and View share (JVM and JS): one definition for
   * the output schema, the encoder and the View's decoder.
   */
@@ -112,6 +116,24 @@ lazy val monitorView       = view("monitor", "system-monitor-server").dependsOn(
 lazy val monitorServer     = server("monitor", "system-monitor-server", monitorView).dependsOn(monitorModel.jvm).settings(
   libraryDependencies += "com.github.oshi" % "oshi-core" % "6.6.6"
 )
+val graalVersion = "25.0.5"
+lazy val sheetMusicView    = view("sheetMusic", "sheet-music-server").dependsOn(abcjs)
+lazy val sheetMusicServer  = server("sheetMusic", "sheet-music-server", sheetMusicView).settings(
+  // abcjs's parser, run in GraalJS.
+  libraryDependencies ++= Seq(
+    "org.graalvm.polyglot" % "polyglot"        % graalVersion,
+    "org.graalvm.js"       % "js-language"     % graalVersion,
+    "org.graalvm.truffle"  % "truffle-runtime" % graalVersion
+  ),
+  Compile / resourceGenerators += Def.task {
+    Def.uncached {
+      val script = (LocalRootProject / baseDirectory).value / "node_modules" / "abcjs" / "dist" / "abcjs-basic-min.js"
+      val out    = (Compile / resourceManaged).value / "abcjs" / "abcjs-basic-min.js"
+      IO.copyFile(script, out)
+      Seq(out)
+    }
+  }.taskValue
+)
 lazy val debugView         = view("debug", "debug-server")
 lazy val debugServer       = server("debug", "debug-server", debugView)
 lazy val integrationView   = view("integration", "integration-server")
@@ -126,9 +148,9 @@ lazy val qrServer          = server("qr", "qr-server", qrView).settings(
 lazy val videoView         = view("video", "video-resource-server")
 lazy val videoServer       = server("video", "video-resource-server", videoView)
 
-lazy val exampleServers = Seq(basicServer, budgetServer, cohortServer, segmentationServer, debugServer, scenarioServer, monitorServer, integrationServer, qrServer, quickstartServer, videoServer)
-lazy val exampleViews   = Seq(basicView, budgetView, cohortView, segmentationView, debugView, scenarioView, monitorView, integrationView, qrView, quickstartView, videoView)
-lazy val facades: Seq[ProjectReference] = Seq(chartjs)
+lazy val exampleServers = Seq(basicServer, budgetServer, cohortServer, segmentationServer, debugServer, scenarioServer, monitorServer, sheetMusicServer, integrationServer, qrServer, quickstartServer, videoServer)
+lazy val exampleViews   = Seq(basicView, budgetView, cohortView, segmentationView, debugView, scenarioView, monitorView, sheetMusicView, integrationView, qrView, quickstartView, videoView)
+lazy val facades: Seq[ProjectReference] = Seq(chartjs, abcjs)
 lazy val models: Seq[ProjectReference]  = Seq(budgetModel.jvm, budgetModel.js, cohortModel.jvm, cohortModel.js, segmentationModel.jvm, segmentationModel.js, scenarioModel.jvm, scenarioModel.js, monitorModel.jvm, monitorModel.js)
 lazy val examples: Seq[ProjectReference] = (exampleServers ++ exampleViews).map(p => p: ProjectReference) ++ facades ++ models
 
