@@ -9,9 +9,12 @@ import org.scalajs.dom
 
 /** Upstream's Lazy Auth public view: buttons that call the protected tools.
   *
-  * The view itself renders without auth. Clicking "Auth me" calls the protected
-  * `get_secret` tool via `callServerTool`; the host receives a 401 from the
-  * server, runs the OAuth flow, retries the call, and the result renders here.
+  * The view renders without auth and shows who is signed in, from the
+  * server's public `whoami` tool (it never sees a token). "Sign in" calls
+  * `unlock_secret`, which needs `mcp:read` and does nothing else, so the host
+  * runs the OAuth flow without the secret being fetched. "Auth me" calls the
+  * protected `get_secret` directly: the host gets a 401, signs in, retries,
+  * and the result renders here.
   */
 object LazyAuthButtonView extends ExampleView:
 
@@ -19,6 +22,8 @@ object LazyAuthButtonView extends ExampleView:
   override def capabilities: AppCapabilities =
     AppCapabilities(availableDisplayModes = Some(List(DisplayMode.`inline`, DisplayMode.fullscreen)))
 
+  private lazy val sessionEl: dom.HTMLElement           = Dom.byId("session")
+  private lazy val signinBtn: dom.HTMLButtonElement     = Dom.byId("signin-btn")
   private lazy val authBtn: dom.HTMLButtonElement       = Dom.byId("auth-btn")
   private lazy val revokeBtn: dom.HTMLButtonElement     = Dom.byId("revoke-btn")
   private lazy val fullscreenBtn: dom.HTMLButtonElement = Dom.byId("fullscreen-btn")
@@ -33,6 +38,30 @@ object LazyAuthButtonView extends ExampleView:
     div.textContent = text
     val _ = outputEl.appendChild(div)
 
+  private def renderSession(s: ViewSession): IO[Unit] = IO {
+    sessionEl.textContent =
+      if s.signedIn then s"Signed in as ${s.username.orElse(s.subject).getOrElse("someone")} (${s.scopes.mkString(", ")})${if s.keyBound then ", token bound to this client's key" else ""}."
+      else s"Not signed in. Locked: ${s.locked.map(_.name).mkString(", ")}."
+    signinBtn.style.display = if s.lock("get_secret").isEmpty then "none" else ""
+  }
+
+  private def refreshSession(view: McpAppView[IO]): IO[Unit] =
+    ViewAuth.session(view).flatMap(renderSession).handleErrorWith(e => IO(sessionEl.textContent = s"Session unknown: ${e.getMessage}"))
+
+  private def signIn(view: McpAppView[IO]): IO[Unit] =
+    ViewAuth.session(view).flatMap { s =>
+      s.lock("get_secret") match
+        case None => renderSession(s)
+        case Some(locked) =>
+          ViewAuth.unlock(view, locked).flatMap {
+            case Right(after) => renderSession(after)
+            case Left(ViewAuth.Outcome.SignInRequired)         => IO(renderOutput("The host did not sign you in.", isError = true))
+            case Left(ViewAuth.Outcome.MoreAccessRequired(ss)) => IO(renderOutput(s"Still missing: ${ss.mkString(", ")}.", isError = true))
+            case Left(ViewAuth.Outcome.Forbidden(why))         => IO(renderOutput(why, isError = true))
+            case Left(ViewAuth.Outcome.Failed(e))              => IO(renderOutput(e.getMessage, isError = true))
+          }
+    }
+
   private def callTool(view: McpAppView[IO], name: String): IO[Unit] =
     IO(outputEl.innerHTML = "") >>
       IO(dom.console.info(s"Calling $name tool...")) >>
@@ -46,10 +75,14 @@ object LazyAuthButtonView extends ExampleView:
         }
         .handleErrorWith { e =>
           IO(renderOutput(e.getMessage, isError = true))
-        }
+        } >> refreshSession(view)
 
   def start(view: McpAppView[IO], ui: Ui): IO[Unit] =
     IO {
+      ui.onClick(signinBtn) {
+        IO(signinBtn.disabled = true) >> signIn(view).guarantee(IO(signinBtn.disabled = false))
+      }
+
       ui.onClick(authBtn) {
         IO(authBtn.disabled = true) >>
           callTool(view, "get_secret").guarantee(IO(authBtn.disabled = false))
@@ -69,7 +102,7 @@ object LazyAuthButtonView extends ExampleView:
           yield ()).handleErrorWith(e => IO(dom.console.warn("Display mode not supported:", e.toString)))
             .guarantee(IO(fullscreenBtn.disabled = false))
       }
-    } >>
+    } >> refreshSession(view).start >>
       SafeArea.follow(view, Dom.query[dom.HTMLElement](".main")).surround(
         view.events.compile.drain
       )

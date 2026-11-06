@@ -9,5 +9,9 @@ test.describe("Lazy Auth Server", () => {
     await expect(app.locator("#auth-btn")).toHaveText("Auth me");
     await expect(app.locator("#revoke-btn")).toHaveText("Revoke token");
     await expect(app.locator("#fullscreen-btn")).toBeVisible();
+    // The session line comes from the server's public whoami tool: no token reaches the View.
+    await expect(app.locator("#session")).toContainText("Not signed in", { timeout: 30000 });
+    await expect(app.locator("#session")).toContainText("get_secret");
+    await expect(app.locator("#signin-btn")).toBeVisible();
   });
 });

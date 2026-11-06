@@ -80,3 +80,8 @@ button {
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+.session {
+  font-size: 0.9em;
+  opacity: 0.8;
+}

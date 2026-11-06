@@ -1,8 +1,9 @@
 package ironmcp.extapps.lazyauth
 
 import cats.effect.IO
-import io.circe.Json
+import io.circe.{Json, JsonObject}
 import io.circe.parser.parse
+import io.circe.syntax.*
 import io.github.iltotore.iron.*
 import ironmcp.auth.*
 import ironmcp.http.McpHeaders
@@ -14,222 +15,154 @@ import org.typelevel.ci.CIString
 
 class LazyAuthSuite extends CatsEffectSuite:
 
+  private val issuer     = "https://auth.example.com"
+  private val resource   = LazyAuthServer.DefaultResource
   private val hmacSecret = "01234567890123456789012345678901".getBytes("UTF-8")
-  private val testValidator = TokenValidator.hs256[IO](
-    hmacSecret,
-    TokenValidator.Config(expectedIssuer = Some("https://auth.example.com"))
-  )
+  private val validator  = TokenValidator.sharedSecret[IO](hmacSecret, TokenValidator.Config(issuer, resource.resource, algorithms = Set(JwsAlgorithm.HS256)))
 
-  private def makeToken(sub: String, scopes: String, sid: String = "session-1"): String =
-    val header = Json.obj("alg" -> Json.fromString("HS256"), "typ" -> Json.fromString("JWT"))
+  private def token(sub: String, scopes: String, sid: String = "session-1", aud: String = resource.resource): String =
     val now = System.currentTimeMillis() / 1000L
-    val payload = Json.obj(
-      "sub"   -> Json.fromString(sub),
-      "iss"   -> Json.fromString("https://auth.example.com"),
-      "scope" -> Json.fromString(scopes),
-      "exp"   -> Json.fromLong(now + 300L),
-      "sid"   -> Json.fromString(sid)
+    Jwt.sign(
+      JwsAlgorithm.HS256,
+      Jwt.hmacKey(hmacSecret),
+      JsonObject("typ" -> "at+jwt".asJson),
+      Json.obj("sub" -> sub.asJson, "iss" -> issuer.asJson, "aud" -> aud.asJson, "scope" -> scopes.asJson, "exp" -> (now + 300).asJson, "sid" -> sid.asJson)
     )
-    Jwt.signHs256(header, payload, hmacSecret)
 
   private val metaJson = """{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}"""
+  private val meta     = RequestMeta(protocolVersion = LatestProtocolVersion, clientCapabilities = ClientCapabilities.none)
 
-  private val meta = RequestMeta(
-    protocolVersion = LatestProtocolVersion,
-    clientCapabilities = ClientCapabilities.none
-  )
+  private def call(name: String, bearer: Option[String] = None): Request[IO] =
+    Request[IO](org.http4s.Method.POST, Uri.unsafeFromString("/mcp"))
+      .putHeaders(
+        Header.Raw(McpHeaders.ProtocolVersion, LatestProtocolVersion),
+        Header.Raw(McpHeaders.Method, "tools/call"),
+        Header.Raw(McpHeaders.Name, McpHeaders.encode(name)),
+        Header.Raw(CIString("Host"), "localhost:3207")
+      )
+      .putHeaders(bearer.map(t => Header.Raw(CIString("Authorization"), s"Bearer $t")).toList)
+      .withEntity(s"""{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"$name","arguments":{},"_meta":$metaJson}}""")
 
-  private def callToolBody(name: String, id: Int): String =
-    s"""{"jsonrpc":"2.0","id":$id,"method":"tools/call","params":{"name":"$name","arguments":{},"_meta":$metaJson}}"""
+  private def app =
+    for
+      (btn, sec)  <- LazyAuthServer.loadPages
+      revocations <- RevocationList.inMemory[IO]
+    yield LazyAuthServer.routes(btn, sec, validator, revocations, audit = AuthAudit.noop[IO]).orNotFound
 
-  test("server loads and registers public show_auth_button, protected get_secret and revoke_auth_token"):
+  private def structured(res: Response[IO]): IO[Json] =
+    res.as[String].map(b => parse(b).toOption.flatMap(_.hcursor.downField("result").downField("structuredContent").focus).getOrElse(Json.Null))
+
+  test("tools and Views are registered; every tool declares who may call it"):
     for
       server <- LazyAuthServer.load
-      toolsResult <- server.tools.get.list(ListToolsParams(meta))
-      names = toolsResult.tools.map(_.name: String).toSet
-      _ = assert(names.contains("show_auth_button"))
-      _ = assert(names.contains("get_secret"))
-      _ = assert(names.contains("revoke_auth_token"))
+      listed <- server.tools.get.list(ListToolsParams(meta))
+      btn    <- server.resources.get.read(ReadResourceParams(uri = (LazyAuthServer.ButtonResourceUri: String).assume, _meta = meta))
+      revocations <- RevocationList.inMemory[IO]
+    yield
+      val all = LazyAuthServer.tools(None, revocations)
+      assertEquals(LazyAuthServer.policy(revocations).undeclared(all*), Nil)
+      assertEquals(listed.tools.map(_.name: String).toSet, Set("show_auth_button", "whoami")) // anonymous: public tools only
+      btn match
+        case r: ReadResourceResult => assert(r.contents.exists { case t: ResourceContents.Text => t.text.contains("Public App"); case _ => false })
+        case other                 => fail(other.toString)
 
-      // Both UI resources are registered and readable
-      resources = server.resources.get
-      btnRead <- resources.read(ReadResourceParams(uri = (LazyAuthServer.ButtonResourceUri: String).assume, _meta = meta))
-      _ = assert(btnRead match
-        case r: ReadResourceResult => r.contents.headOption.exists {
-          case t: ResourceContents.Text => t.text.contains("Public App")
-          case _                        => false
-        }
-        case _ => false
+  test("metadata is served where the challenge points, for this resource"):
+    for
+      routes <- app
+      res    <- routes.run(Request[IO](org.http4s.Method.GET, Uri.unsafeFromString("/.well-known/oauth-protected-resource/mcp")))
+      body   <- res.as[String]
+    yield
+      val c = parse(body).toOption.get.hcursor
+      assertEquals(c.get[String]("resource"), Right(resource.resource))
+      assertEquals(c.get[List[String]]("authorization_servers"), Right(List(LazyAuthServer.DefaultKeycloakRealm)))
+      assertEquals(c.get[List[String]]("scopes_supported"), Right(List("mcp:read")))
+
+  test("public tools need no token; whoami says what signing in unlocks"):
+    for
+      routes <- app
+      ok     <- routes.run(call("show_auth_button"))
+      who    <- routes.run(call("whoami")).flatMap(structured)
+    yield
+      assertEquals(ok.status, Status.Ok)
+      assertEquals(who.hcursor.get[Boolean]("signedIn"), Right(false))
+      assertEquals(who.hcursor.downField("locked").as[List[Json]].map(_.flatMap(_.hcursor.get[String]("unlockWith").toOption)), Right(List("unlock_secret", "unlock_secret")))
+
+  test("a host can read the Views' pages before sign-in (over HTTP, as basic-host does)"):
+    val read = Request[IO](org.http4s.Method.POST, Uri.unsafeFromString("/mcp"))
+      .putHeaders(
+        Header.Raw(McpHeaders.ProtocolVersion, LatestProtocolVersion),
+        Header.Raw(McpHeaders.Method, "resources/read"),
+        Header.Raw(McpHeaders.Name, McpHeaders.encode(LazyAuthServer.ButtonResourceUri)),
+        Header.Raw(CIString("Host"), "localhost:3207")
       )
-
-      secRead <- resources.read(ReadResourceParams(uri = (LazyAuthServer.SecretResourceUri: String).assume, _meta = meta))
-      _ = assert(secRead match
-        case r: ReadResourceResult => r.contents.headOption.exists {
-          case t: ResourceContents.Text => t.text.contains("Protected App")
-          case _                        => false
-        }
-        case _ => false
-      )
-    yield ()
-
-  test("metadataRoutes serve RFC 9728 Protected Resource Metadata at well-known endpoints"):
-    val routes = LazyAuthServer.metadataRoutes("http://localhost:3214/mcp", LazyAuthServer.DefaultKeycloakRealm)
-    val req = Request[IO](org.http4s.Method.GET, Uri.unsafeFromString("/.well-known/oauth-protected-resource/mcp"))
-    routes.orNotFound.run(req).flatMap { res =>
+      .withEntity(s"""{"jsonrpc":"2.0","id":1,"method":"resources/read","params":{"uri":"${LazyAuthServer.ButtonResourceUri}","_meta":$metaJson}}""")
+    for
+      routes <- app
+      res    <- routes.run(read)
+      body   <- res.as[String]
+    yield
       assertEquals(res.status, Status.Ok)
-      res.as[String].map { body =>
-        val json = parse(body).toOption.get
-        assertEquals(json.hcursor.get[String]("resource"), Right("http://localhost:3214/mcp"))
-        assertEquals(json.hcursor.get[List[String]]("authorization_servers"), Right(List(LazyAuthServer.DefaultKeycloakRealm)))
-        assert(json.hcursor.get[List[String]]("scopes_supported").toOption.exists(_.contains("mcp:read")))
-      }
-    }
+      assert(body.contains("Public App"))
 
-  test("lazy auth HTTP: public tools and metadata succeed with no auth"):
+  test("a protected tool without a token gets 401 with resource_metadata where the metadata really is"):
     for
-      pages <- LazyAuthServer.loadPages
-      (btn, sec) = pages
-      routes = LazyAuthServer.routes(btn, sec, testValidator)
+      routes <- app
+      res    <- routes.run(call("get_secret"))
+    yield
+      assertEquals(res.status, Status.Unauthorized)
+      val c = AuthChallenge.parse(res.headers.get(CIString("WWW-Authenticate")).toList.flatMap(_.toList.map(_.value))).head
+      assertEquals(c.param("resource_metadata"), Some("http://localhost:3207/.well-known/oauth-protected-resource/mcp"))
+      assertEquals(c.scopes, Set("mcp:read"))
 
-      callReq = Request[IO](org.http4s.Method.POST, Uri.unsafeFromString("/mcp"))
-        .putHeaders(
-          Header.Raw(McpHeaders.ProtocolVersion, LatestProtocolVersion),
-          Header.Raw(McpHeaders.Method, "tools/call"),
-          Header.Raw(McpHeaders.Name, McpHeaders.encode("show_auth_button")),
-          Header.Raw(CIString("Host"), "localhost:3214")
-        )
-        .withEntity(callToolBody("show_auth_button", 1))
-
-      res <- routes.orNotFound.run(callReq)
-      _ = assertEquals(res.status, Status.Ok)
-    yield ()
-
-  test("lazy auth HTTP: calling protected get_secret with no auth returns 401 with WWW-Authenticate"):
+  test("insufficient scope is a 403 naming mcp:read"):
     for
-      pages <- LazyAuthServer.loadPages
-      (btn, sec) = pages
-      routes = LazyAuthServer.routes(btn, sec, testValidator)
+      routes <- app
+      res    <- routes.run(call("get_secret", Some(token("bob", "mcp:unrelated"))))
+    yield
+      assertEquals(res.status, Status.Forbidden)
+      assertEquals(AuthChallenge.parse(List(res.headers.get(CIString("WWW-Authenticate")).get.head.value)).head.scopes, Set("mcp:read"))
 
-      callReq = Request[IO](org.http4s.Method.POST, Uri.unsafeFromString("/mcp"))
-        .putHeaders(
-          Header.Raw(McpHeaders.ProtocolVersion, LatestProtocolVersion),
-          Header.Raw(McpHeaders.Method, "tools/call"),
-          Header.Raw(McpHeaders.Name, McpHeaders.encode("get_secret")),
-          Header.Raw(CIString("Host"), "localhost:3214")
-        )
-        .withEntity(callToolBody("get_secret", 2))
-
-      res <- routes.orNotFound.run(callReq)
-      _ = assertEquals(res.status, Status.Unauthorized)
-      wwwAuth = res.headers.get(CIString("WWW-Authenticate")).map(_.head.value)
-      _ = assert(wwwAuth.exists(_.startsWith("Bearer resource_metadata=")), wwwAuth)
-    yield ()
-
-  test("lazy auth HTTP: calling get_secret with insufficient scope returns 403 Forbidden with scope challenge"):
+  test("a token minted for another server is refused (the audience check the old example lacked)"):
     for
-      pages <- LazyAuthServer.loadPages
-      (btn, sec) = pages
-      routes = LazyAuthServer.routes(btn, sec, testValidator)
+      routes <- app
+      res    <- routes.run(call("get_secret", Some(token("alice", "mcp:read", aud = "https://other.example/mcp"))))
+    yield assertEquals(res.status, Status.Unauthorized)
 
-      token = makeToken("user-bob", "mcp:unrelated")
-      callReq = Request[IO](org.http4s.Method.POST, Uri.unsafeFromString("/mcp"))
-        .putHeaders(
-          Header.Raw(McpHeaders.ProtocolVersion, LatestProtocolVersion),
-          Header.Raw(McpHeaders.Method, "tools/call"),
-          Header.Raw(McpHeaders.Name, McpHeaders.encode("get_secret")),
-          Header.Raw(CIString("Authorization"), s"Bearer $token"),
-          Header.Raw(CIString("Host"), "localhost:3214")
-        )
-        .withEntity(callToolBody("get_secret", 3))
-
-      res <- routes.orNotFound.run(callReq)
-      _ = assertEquals(res.status, Status.Forbidden)
-      wwwAuth = res.headers.get(CIString("WWW-Authenticate")).map(_.head.value)
-      _ = assert(wwwAuth.exists(_.contains("insufficient_scope")), wwwAuth)
-      _ = assert(wwwAuth.exists(_.contains("scope=\"mcp:read\"")), wwwAuth)
-    yield ()
-
-  test("lazy auth HTTP: calling get_secret with valid token returns secret, revoke_auth_token revokes it"):
+  test("an invalid token on a public tool is refused, not treated as anonymous"):
     for
-      pages <- LazyAuthServer.loadPages
-      (btn, sec) = pages
-      routes = LazyAuthServer.routes(btn, sec, testValidator)
+      routes <- app
+      res    <- routes.run(call("show_auth_button", Some(token("alice", "mcp:read").dropRight(3) + "AAA")))
+    yield assertEquals(res.status, Status.Unauthorized)
 
-      token = makeToken("user-alice", "mcp:read", sid = "session-alice-123")
-      callReq = Request[IO](org.http4s.Method.POST, Uri.unsafeFromString("/mcp"))
-        .putHeaders(
-          Header.Raw(McpHeaders.ProtocolVersion, LatestProtocolVersion),
-          Header.Raw(McpHeaders.Method, "tools/call"),
-          Header.Raw(McpHeaders.Name, McpHeaders.encode("get_secret")),
-          Header.Raw(CIString("Authorization"), s"Bearer $token"),
-          Header.Raw(CIString("Host"), "localhost:3214")
-        )
-        .withEntity(callToolBody("get_secret", 4))
+  test("get_secret with mcp:read returns the secret; after revoke_auth_token the session's tokens are refused as revoked"):
+    val alice = token("alice", "mcp:read", sid = "session-alice-123")
+    for
+      routes  <- app
+      secret  <- routes.run(call("get_secret", Some(alice))).flatMap(structured)
+      revoke  <- routes.run(call("revoke_auth_token", Some(alice))).flatMap(structured)
+      after   <- routes.run(call("get_secret", Some(alice)))
+      body    <- after.as[String]
+    yield
+      assertEquals(secret.hcursor.get[String]("secret"), Right("the-answer-is-42"))
+      assertEquals(secret.hcursor.get[String]("subject"), Right("alice"))
+      assertEquals(revoke.hcursor.get[Boolean]("revoked"), Right(true))
+      assertEquals(after.status, Status.Unauthorized)
+      assert(body.contains("revoked"), body)
 
-      res1 <- routes.orNotFound.run(callReq)
-      _ = assertEquals(res1.status, Status.Ok)
-      bodyStr1 <- res1.as[String]
-      _ = assert(bodyStr1.contains("the-answer-is-42"), bodyStr1)
-      _ = assert(bodyStr1.contains("user-alice"), bodyStr1)
-
-      // Now call revoke_auth_token with this session
-      revokeReq = Request[IO](org.http4s.Method.POST, Uri.unsafeFromString("/mcp"))
-        .putHeaders(
-          Header.Raw(McpHeaders.ProtocolVersion, LatestProtocolVersion),
-          Header.Raw(McpHeaders.Method, "tools/call"),
-          Header.Raw(McpHeaders.Name, McpHeaders.encode("revoke_auth_token")),
-          Header.Raw(CIString("Authorization"), s"Bearer $token"),
-          Header.Raw(CIString("Host"), "localhost:3214")
-        )
-        .withEntity(callToolBody("revoke_auth_token", 5))
-
-      resRevoke <- routes.orNotFound.run(revokeReq)
-      _ = assertEquals(resRevoke.status, Status.Ok)
-      bodyRevoke <- resRevoke.as[String]
-      _ = assert(bodyRevoke.contains("Session revoked"), bodyRevoke)
-
-      // Subsequent call with the revoked session is rejected with 401
-      res2 <- routes.orNotFound.run(callReq)
-      _ = assertEquals(res2.status, Status.Unauthorized)
-      bodyStr2 <- res2.as[String]
-      _ = assert(bodyStr2.contains("Session has been revoked"), bodyStr2)
-    yield ()
-
-  test("live danarch Keycloak integration: RS256 token verification against live Keycloak"):
-    import scala.concurrent.duration.*
+  test("live Keycloak (iron-mcp realm): a real token reaches get_secret"):
+    val env = List("IRON_MCP_KC_REALM", "IRON_MCP_KC_CLIENT", "IRON_MCP_KC_SECRET", "IRON_MCP_KC_RESOURCE").map(k => k -> sys.env.get(k)).toMap
+    assume(env.values.forall(_.isDefined), "set IRON_MCP_KC_* (scripts/keycloak-realm.sh in iron-mcp prints them) to run against Keycloak")
     EmberClientBuilder.default[IO].build.use { client =>
-      val kc = new KeycloakClient[IO](client, Uri.unsafeFromString(LazyAuthServer.DefaultKeycloakRealm))
-      kc.discover.timeout(2.seconds).attempt.flatMap {
-        case Left(_) =>
-          IO(println("Keycloak on danarch not reachable; skipping live integration test."))
-        case Right(oidc) =>
-          for
-            // Acquire live token with mcp:read scope from danarch Keycloak
-            tokenEndpoint = Uri.unsafeFromString(oidc.token_endpoint)
-            tok <- kc.clientCredentials(tokenEndpoint, "iron-mcp-client", "iron-mcp-secret-12345", scopes = Set("mcp:read"))
-            _ = assert(tok.grantedScopes.contains("mcp:read"))
-
-            // Build LazyAuthServer routes wired to Keycloak's published JWKS
-            pages <- LazyAuthServer.loadPages
-            (btn, sec) = pages
-            validator <- LazyAuthServer.keycloakValidator(client, LazyAuthServer.DefaultKeycloakRealm)
-            routes = LazyAuthServer.routes(btn, sec, validator)
-
-            // Call protected get_secret with the live Keycloak RS256 Bearer token
-            req = Request[IO](org.http4s.Method.POST, Uri.unsafeFromString("/mcp"))
-              .putHeaders(
-                Header.Raw(McpHeaders.ProtocolVersion, LatestProtocolVersion),
-                Header.Raw(McpHeaders.Method, "tools/call"),
-                Header.Raw(McpHeaders.Name, McpHeaders.encode("get_secret")),
-                Header.Raw(CIString("Authorization"), s"Bearer ${tok.access_token}"),
-                Header.Raw(CIString("Host"), "localhost:3214")
-              )
-              .withEntity(callToolBody("get_secret", 42))
-
-            res <- routes.orNotFound.run(req)
-            _ = assertEquals(res.status, Status.Ok)
-            bodyStr <- res.as[String]
-            _ = assert(bodyStr.contains("the-answer-is-42"), bodyStr)
-          yield ()
-      }
+      val realm = env("IRON_MCP_KC_REALM").get
+      val live  = ResourceIdentity.unsafe(env("IRON_MCP_KC_RESOURCE").get)
+      val kc    = new KeycloakClient[IO](client, Uri.unsafeFromString(realm))
+      for
+        oidc        <- kc.discover
+        tok         <- kc.clientCredentials(oidc, ClientAuth.SecretPost(env("IRON_MCP_KC_CLIENT").get, env("IRON_MCP_KC_SECRET").get), Set("mcp:read"))
+        (btn, sec)  <- LazyAuthServer.loadPages
+        keycloak    <- LazyAuthServer.keycloakValidator(client, oidc.issuer, live)
+        revocations <- RevocationList.inMemory[IO]
+        routes       = LazyAuthServer.routes(btn, sec, keycloak, revocations, live, oidc.issuer, AuthAudit.noop[IO]).orNotFound
+        res         <- routes.run(call("get_secret", Some(tok.access_token)))
+      yield assertEquals(res.status, Status.Ok)
     }

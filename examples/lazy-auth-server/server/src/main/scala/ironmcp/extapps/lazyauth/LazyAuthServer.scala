@@ -2,108 +2,79 @@ package ironmcp.extapps.lazyauth
 
 import cats.effect.{IO, Resource}
 import cats.syntax.all.*
-import io.circe.syntax.*
+import io.circe.Encoder
 import io.github.iltotore.iron.*
 import ironmcp.apps.*
 import ironmcp.auth.*
 import ironmcp.extapps.{ExampleServer, NoArgs, ViewPage}
-import ironmcp.http.{McpHeaders, McpHttp}
+import ironmcp.http.McpHttp
 import ironmcp.protocol.*
+import ironmcp.schema.JsonSchemaOf
 import ironmcp.server.*
 import org.http4s.*
-import org.http4s.circe.*
 import org.http4s.client.Client
 import org.http4s.ember.client.EmberClientBuilder
-import org.http4s.headers.`Content-Type`
-import org.typelevel.ci.CIString
 
-import java.util.concurrent.ConcurrentHashMap
-
-/** Lazy Auth Server:
+/** Lazy Auth Server, on iron-mcp-auth:
   *
-  *  - Connects without authentication: `initialize`, `tools/list`, and public
-  *    tools (`show_auth_button`) succeed with no token.
-  *  - Protected tools (`get_secret`, `revoke_auth_token`) respond 401 with a
-  *    `WWW-Authenticate` header pointing at RFC 9728 Protected Resource Metadata,
-  *    directing the host to the Keycloak Authorization Server on danarch.
-  *  - The `show_auth_button` MCP App is public; clicking "Auth me" calls the
-  *    protected `get_secret` tool via `callServerTool`. The host receives the 401,
-  *    runs OAuth with Keycloak, retries, and the result renders inline.
+  *  - Anyone may connect, list tools and call `show_auth_button` and
+  *    `whoami` without a token (`McpAuthServer.routesForOptional`).
+  *  - `get_secret` and `revoke_auth_token` need `mcp:read`. The first call
+  *    without a token gets a `401` pointing at the RFC 9728 metadata, so the
+  *    host signs in with Keycloak and retries; tokens are checked for issuer,
+  *    audience (this server's URL), type, expiry and revocation.
+  *  - `unlock_secret` needs `mcp:read` and does nothing else: the View calls
+  *    it to sign in up front, without fetching the secret.
+  *
+  * Every rule is declared on its tool (`.public`, `.requires`), and a tool
+  * without one cannot be called at all.
   */
 object LazyAuthServer:
 
   val ButtonResourceUri: UiUri = "ui://lazy-auth/mcp-app.html"
   val SecretResourceUri: UiUri = "ui://lazy-auth/secret-app.html"
-  val DefaultKeycloakRealm: String = "https://danarch.tail09c16c.ts.net:10000/realms/hacker-bros"
+  val DefaultKeycloakRealm: String = "https://danarch.tail09c16c.ts.net:10000/realms/iron-mcp"
+  val DefaultResource: ResourceIdentity = ResourceIdentity.unsafe("http://localhost:3207/mcp")
 
-  val ProtectedTools: Set[String] = Set("get_secret", "revoke_auth_token")
+  final case class Secret(subject: String, secret: String, issuedAt: String) derives Encoder.AsObject, JsonSchemaOf
+  final case class Revoked(revoked: Boolean, session: Option[String]) derives Encoder.AsObject, JsonSchemaOf
 
-  val defaultScopePolicy: ToolScopePolicy = ToolScopePolicy.exact(
-    Map(
-      "get_secret"        -> Set("mcp:read"),
-      "revoke_auth_token" -> Set("mcp:read")
-    )
-  )
+  /** The tools for one caller. Their access rules do not depend on the
+    * caller, so [[policy]] is built from them once.
+    */
+  def tools(caller: Option[TokenClaims], revocations: RevocationList[IO]): List[McpTool[IO]] =
+    val showAuthButton = McpTool[NoArgs]("show_auth_button", "Shows a button that calls the protected get_secret tool.", title = Some("Show Auth Button"))(_ =>
+      IO.pure("ok")
+    ).withUi(ButtonResourceUri).public
 
-  /** Revoked session IDs (`sid`). */
-  val revokedSids: java.util.Set[String] = ConcurrentHashMap.newKeySet[String]()
-
-  def createServer(
-      buttonHtml: String,
-      secretHtml: String,
-      authClaims: Option[TokenClaims]
-  ): McpServer[IO] =
-    val showAuthButton = McpTool[NoArgs](
-      "show_auth_button",
-      "Public tool: shows a button that triggers the protected get_secret tool.",
-      title = Some("Show Auth Button")
-    )(_ => IO.pure(CallToolResult(List(ContentBlock.Text("ok"))))).withUi(ButtonResourceUri)
-
-    val getSecret = McpTool[NoArgs](
-      "get_secret",
-      "Protected tool: returns secret data. Requires authentication.",
-      title = Some("Get Secret")
-    ) { _ =>
-      authClaims match
-        case None =>
-          IO.pure(CallToolResult(List(ContentBlock.Text("Authentication required.")), isError = Some(true)))
+    val getSecret = McpTool[NoArgs]("get_secret", "Returns secret data. Requires sign-in.", title = Some("Get Secret"))(_ =>
+      caller match
+        case None => IO.pure(Left("sign-in required"))
         case Some(claims) =>
-          for
-            now <- IO.realTimeInstant
-            sub = claims.sub.getOrElse("anonymous")
-            json = io.circe.Json.obj(
-              "subject"  -> io.circe.Json.fromString(sub),
-              "secret"   -> io.circe.Json.fromString("the-answer-is-42"),
-              "issuedAt" -> io.circe.Json.fromString(now.toString)
-            )
-          yield CallToolResult(List(ContentBlock.Text(json.spaces2)))
-    }.withUi(SecretResourceUri)
+          IO.realTimeInstant.map(now => Right(Secret(claims.sub.getOrElse("unknown"), "the-answer-is-42", now.toString)))
+    ).withUi(SecretResourceUri).requires("mcp:read")
 
-    val revokeAuthToken = McpTool[NoArgs](
-      "revoke_auth_token",
-      "Protected tool: revokes the caller's entire auth session (access + refresh token).",
-      title = Some("Revoke Auth Token")
-    ) { _ =>
-      authClaims match
-        case None =>
-          IO.pure(CallToolResult(List(ContentBlock.Text("Authentication required.")), isError = Some(true)))
-        case Some(claims) =>
-          val sidOpt = claims.rawJson.hcursor.get[String]("sid").toOption
-          sidOpt.foreach(revokedSids.add)
-          IO.pure(
-            CallToolResult(
-              List(
-                ContentBlock.Text(
-                  s"Session revoked (sid: ${sidOpt.getOrElse("unknown")}). Access + refresh token invalid."
-                )
-              )
-            )
-          )
-    }
+    val revokeAuthToken = McpTool[NoArgs]("revoke_auth_token", "Revokes the caller's session on this server.", title = Some("Revoke Auth Token"))(_ =>
+      caller match
+        case None         => IO.pure(Left("sign-in required"))
+        case Some(claims) => revocations.revoke(claims).as(Right(Revoked(revoked = true, claims.sid)))
+    ).requires("mcp:read")
 
+    val base   = AuthPolicy.fromTools(showAuthButton, getSecret, revokeAuthToken)
+    val unlock = SessionTools.unlock[IO]("unlock_secret", caller, base)("mcp:read").withVisibility(Visibility.App)
+    val whoami = SessionTools.whoami[IO](caller, base.withTools(unlock))
+    List(showAuthButton, getSecret, revokeAuthToken, unlock, whoami)
+
+  /** Who may do what: read off the tools, with listing and the Views'
+    * pages open to anonymous callers (the host fetches them before sign-in).
+    */
+  def policy(revocations: RevocationList[IO]): AuthPolicy =
+    AuthPolicy.fromTools(tools(None, revocations)*).views().publicListing
+
+  def createServer(buttonHtml: String, secretHtml: String, caller: Option[TokenClaims], revocations: RevocationList[IO]): McpServer[IO] =
     McpServer(
-      info = Implementation(name = "Lazy Auth Demo", version = "1.0.0"),
-      tools = Some(ToolSet.of(showAuthButton, getSecret, revokeAuthToken)),
+      info = Implementation(name = "Lazy Auth Demo", version = "2.0.0"),
+      tools = Some(ScopedTools(ToolSet(tools(caller, revocations)), policy(revocations), caller)),
       resources = Some(
         UiResources.of[IO](
           UiResource(ButtonResourceUri, "ui://lazy-auth/mcp-app.html", buttonHtml, Some("Lazy Auth Demo")),
@@ -113,161 +84,56 @@ object LazyAuthServer:
       extensions = Some(Map(McpApps.serverExtension))
     )
 
-  /** Serves RFC 9728 Protected Resource Metadata pointing to Keycloak. */
-  def metadataRoutes(serverUrl: String, keycloakRealm: String): HttpRoutes[IO] =
-    val prm = ProtectedResourceMetadata(
-      resource = serverUrl,
-      authorization_servers = List(keycloakRealm),
-      scopes_supported = Some(List("mcp:read", "mcp:export", "mcp:admin")),
-      bearer_methods_supported = Some(List("header"))
-    )
-    val rootPath = "/.well-known/oauth-protected-resource"
-    val mcpPath  = s"$rootPath/mcp"
-    val prmPath  = "/auth/prm"
+  def config(resource: ResourceIdentity, keycloakRealm: String, revocations: RevocationList[IO]): McpAuthServer.Config =
+    McpAuthServer.Config(resource, List(keycloakRealm), policy(revocations), http = McpHttp.Config(cors = true), resourceName = Some("Lazy Auth Demo"))
 
-    HttpRoutes.of[IO] {
-      case req if req.method == org.http4s.Method.GET && Set(rootPath, mcpPath, prmPath).contains(req.uri.path.renderString) =>
-        IO.pure(
-          Response[IO](Status.Ok)
-            .putHeaders(Header.Raw(CIString("Access-Control-Allow-Origin"), "*"))
-            .withEntity(prm.asJson)
-            .withContentType(`Content-Type`(MediaType.application.json))
-        )
-    }
-
+  /** The MCP endpoint and its RFC 9728 metadata. Tokens revoked through
+    * `revoke_auth_token` are refused from then on.
+    */
   def routes(
       buttonHtml: String,
       secretHtml: String,
       validator: TokenValidator[IO],
-      serverUrl: String = "http://localhost:3214/mcp",
+      revocations: RevocationList[IO],
+      resource: ResourceIdentity = DefaultResource,
       keycloakRealm: String = DefaultKeycloakRealm,
-      scopePolicy: ToolScopePolicy = defaultScopePolicy
+      audit: AuthAudit[IO] = AuthAudit.jsonLines[IO](line => IO.println(s"auth $line"))
   ): HttpRoutes[IO] =
-    val prmUrl = s"${serverUrl.stripSuffix("/")}/.well-known/oauth-protected-resource/mcp"
-    val wellKnown = metadataRoutes(serverUrl, keycloakRealm)
-
-    val mcpConfig = McpHttp.Config(path = "/mcp", cors = true)
-    val mcpRoutes = McpHttp.routesFor[IO](mcpConfig) { req =>
-      val isToolsCall = req.headers.get(McpHeaders.Method).exists(_.head.value == "tools/call")
-      val toolNameOpt = req.headers.get(McpHeaders.Name).map(_.head.value).flatMap(McpHeaders.decode)
-      val isProtected = isToolsCall && toolNameOpt.exists(ProtectedTools.contains)
-
-      val authHeader = req.headers.get(CIString("Authorization")).map(_.head.value)
-      val tokenOpt = authHeader.flatMap { h =>
-        if h.startsWith("Bearer ") then Some(h.substring("Bearer ".length).trim)
-        else None
-      }
-
-      if isProtected then
-        tokenOpt match
-          case None =>
-            IO.pure(Left(unauthorizedResponse(AuthError.MissingToken, prmUrl)))
-          case Some(token) =>
-            validator.validate(token).flatMap {
-              case Left(err) =>
-                IO.pure(Left(unauthorizedResponse(err, prmUrl)))
-              case Right(claims) =>
-                val sidOpt = claims.rawJson.hcursor.get[String]("sid").toOption
-                if sidOpt.exists(revokedSids.contains) then
-                  IO.pure(
-                    Left(
-                      unauthorizedResponse(
-                        AuthError.InvalidSignature("Session has been revoked"),
-                        prmUrl
-                      )
-                    )
-                  )
-                else
-                  val toolName = toolNameOpt.getOrElse("")
-                  scopePolicy.check(toolName, claims.scopes) match
-                    case Left(required) =>
-                      IO.pure(Left(forbiddenResponse(required, claims, prmUrl)))
-                    case Right(()) =>
-                      IO.pure(Right(createServer(buttonHtml, secretHtml, Some(claims))))
-            }
-      else
-        tokenOpt match
-          case Some(token) =>
-            validator.validate(token).map {
-              case Right(claims) => Right(createServer(buttonHtml, secretHtml, Some(claims)))
-              case Left(_)       => Right(createServer(buttonHtml, secretHtml, None))
-            }
-          case None =>
-            IO.pure(Right(createServer(buttonHtml, secretHtml, None)))
+    McpAuthServer.routesForOptional(validator.withRevocation(revocations), config(resource, keycloakRealm, revocations), audit) { (_, caller) =>
+      IO.pure(Right(createServer(buttonHtml, secretHtml, caller, revocations)))
     }
-
-    wellKnown <+> mcpRoutes
-
-  private def unauthorizedResponse(err: AuthError, resourceMetadataUrl: String): Response[IO] =
-    val errorKind = err match
-      case AuthError.MissingToken => "invalid_request"
-      case _                      => "invalid_token"
-
-    val challenge =
-      if err == AuthError.MissingToken then s"""Bearer resource_metadata="$resourceMetadataUrl""""
-      else s"""Bearer error="$errorKind", error_description="${err.description}", resource_metadata="$resourceMetadataUrl""""
-
-    val body = io.circe.Json.obj(
-      "error"             -> errorKind.asJson,
-      "error_description" -> err.description.asJson
-    )
-    Response[IO](Status.Unauthorized)
-      .putHeaders(
-        Header.Raw(CIString("WWW-Authenticate"), challenge),
-        Header.Raw(CIString("Access-Control-Expose-Headers"), "WWW-Authenticate, MCP-Protocol-Version")
-      )
-      .withEntity(body)
-      .withContentType(`Content-Type`(MediaType.application.json))
-
-  private def forbiddenResponse(required: Set[String], claims: TokenClaims, resourceMetadataUrl: String): Response[IO] =
-    val desc = s"Requires [${required.mkString(" ")}]; the token grants [${claims.scopes.mkString(" ")}]."
-    val challenge =
-      s"""Bearer error="insufficient_scope", error_description="$desc", scope="${required.mkString(" ")}", resource_metadata="$resourceMetadataUrl""""
-    val body = io.circe.Json.obj(
-      "error"             -> "insufficient_scope".asJson,
-      "error_description" -> desc.asJson
-    )
-    Response[IO](Status.Forbidden)
-      .putHeaders(
-        Header.Raw(CIString("WWW-Authenticate"), challenge),
-        Header.Raw(CIString("Access-Control-Expose-Headers"), "WWW-Authenticate, MCP-Protocol-Version")
-      )
-      .withEntity(body)
-      .withContentType(`Content-Type`(MediaType.application.json))
 
   def loadPages: IO[(String, String)] =
     (ViewPage.load("lazy-auth-server/button-view"), ViewPage.load("lazy-auth-server/secret-view")).tupled
 
-  def keycloakValidator(client: Client[IO], keycloakRealm: String): IO[TokenValidator[IO]] =
-    val jwksUri = org.http4s.Uri.unsafeFromString(s"${keycloakRealm.stripSuffix("/")}/protocol/openid-connect/certs")
-    JwksProvider.keycloak[IO](client, jwksUri).map { jwks =>
-      TokenValidator.rs256[IO](jwks, TokenValidator.Config(expectedIssuer = Some(keycloakRealm)))
-    }
+  /** Keycloak's tokens for this server: its JWKS, its issuer, this resource as audience. */
+  def keycloakValidator(client: Client[IO], keycloakRealm: String, resource: ResourceIdentity): IO[TokenValidator[IO]] =
+    JwksProvider
+      .remote[IO](client, Uri.unsafeFromString(s"${keycloakRealm.stripSuffix("/")}/protocol/openid-connect/certs"))
+      .map(keys => TokenValidator.jwks[IO](keys, TokenValidator.Config(keycloakRealm, resource)))
 
   def loadRoutes(
-      serverUrl: String = "http://localhost:3214/mcp",
+      resource: ResourceIdentity = DefaultResource,
       keycloakRealm: String = DefaultKeycloakRealm,
       client: Option[Client[IO]] = None
   ): Resource[IO, HttpRoutes[IO]] =
     for
-      pages <- Resource.eval(loadPages)
-      (buttonHtml, secretHtml) = pages
-      c <- client match
-        case Some(existing) => Resource.pure[IO, Client[IO]](existing)
-        case None           => EmberClientBuilder.default[IO].build
-      validator <- Resource.eval(keycloakValidator(c, keycloakRealm))
-    yield routes(buttonHtml, secretHtml, validator, serverUrl, keycloakRealm)
+      (buttonHtml, secretHtml) <- Resource.eval(loadPages)
+      c <- client.fold(EmberClientBuilder.default[IO].build)(Resource.pure)
+      validator   <- Resource.eval(keycloakValidator(c, keycloakRealm, resource))
+      revocations <- Resource.eval(RevocationList.inMemory[IO])
+    yield routes(buttonHtml, secretHtml, validator, revocations, resource, keycloakRealm)
 
   def load: IO[McpServer[IO]] =
-    loadPages.map((btn, sec) => createServer(btn, sec, None))
+    (loadPages, RevocationList.inMemory[IO]).flatMapN((pages, revocations) => IO.pure(createServer(pages._1, pages._2, None, revocations)))
 
 object Main extends cats.effect.IOApp:
   def run(args: List[String]): IO[cats.effect.ExitCode] =
-    val port = sys.env.get("PORT").flatMap(_.toIntOption).getOrElse(3097)
-    val realm = sys.env.getOrElse("KEYCLOAK_REALM", LazyAuthServer.DefaultKeycloakRealm)
-    val serverUrl = sys.env.getOrElse("PUBLIC_URL", s"http://localhost:$port/mcp")
-    LazyAuthServer.loadRoutes(serverUrl, realm).use { routes =>
+    val port     = sys.env.get("PORT").flatMap(_.toIntOption).getOrElse(3097)
+    val realm    = sys.env.getOrElse("KEYCLOAK_REALM", LazyAuthServer.DefaultKeycloakRealm)
+    val resource = ResourceIdentity.unsafe(sys.env.getOrElse("PUBLIC_URL", s"http://localhost:$port/mcp"))
+    LazyAuthServer.loadRoutes(resource, realm).use { routes =>
       ExampleServer.httpRoutes(routes, port).use { _ =>
-        IO.println(s"lazy-auth-server: listening on $serverUrl (Keycloak: $realm)") >> IO.never
+        IO.println(s"lazy-auth-server: listening on $resource (Keycloak: $realm)") >> IO.never
       }
     }.as(cats.effect.ExitCode.Success)
