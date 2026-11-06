@@ -80,11 +80,14 @@ def server(id: String, dir: String, views: Project*): Project =
 
 lazy val basicView        = view("basic", "basic-server")
 lazy val basicServer      = server("basic", "basic-server", basicView)
+lazy val integrationView   = view("integration", "integration-server")
+lazy val integrationServer = server("integration", "integration-server", integrationView)
 lazy val quickstartView   = view("quickstart", "quickstart")
 lazy val quickstartServer = server("quickstart", "quickstart", quickstartView)
 
-lazy val examples: Seq[ProjectReference] = Seq(basicView, basicServer, quickstartView, quickstartServer)
-lazy val exampleServers = Seq(basicServer, quickstartServer)
+lazy val exampleServers = Seq(basicServer, integrationServer, quickstartServer)
+lazy val exampleViews   = Seq(basicView, integrationView, quickstartView)
+lazy val examples: Seq[ProjectReference] = (exampleServers ++ exampleViews).map(p => p: ProjectReference)
 
 // Every server in one JVM, as upstream's run-all.ts does, for basic-host and the e2e suite.
 lazy val runAll = (project in file("examples/run-all"))

@@ -13,7 +13,8 @@ import ironmcp.server.ServerHandler
 object RunAll extends IOApp.Simple:
 
   private val examples: List[(String, IO[ServerHandler[IO]])] = List(
-    "basic-server" -> basic.BasicServer.load,
+    "basic-server"       -> basic.BasicServer.load,
+    "integration-server" -> integration.IntegrationServer.load,
     "quickstart"   -> quickstart.QuickstartServer.load
   )
 
