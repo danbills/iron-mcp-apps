@@ -1,6 +1,6 @@
 val scala3Version = "3.9.0"
-// Local snapshot from ~/iron-mcp (`sbt 'set ThisBuild / version := "0.5.0-SNAPSHOT"; publishLocal'`).
-val ironMcpVersion = "0.5.0-SNAPSHOT"
+// Published from ~/iron-mcp (v0.5.0).
+val ironMcpVersion = "0.5.0"
 val http4sVersion  = "0.23.37"
 
 ThisBuild / scalaVersion := scala3Version
@@ -50,6 +50,26 @@ lazy val abcjs = (project in file("facades/abcjs"))
   .enablePlugins(ScalaJSPlugin)
   .settings(name := "facade-abcjs", libraryDependencies += "org.scala-js" %% "scalajs-dom" % "2.8.1")
 
+lazy val webspeech = (project in file("facades/webspeech"))
+  .enablePlugins(ScalaJSPlugin)
+  .settings(name := "facade-webspeech", libraryDependencies += "org.scala-js" %% "scalajs-dom" % "2.8.1")
+
+lazy val shadertoyFacade = (project in file("facades/shadertoy"))
+  .enablePlugins(ScalaJSPlugin)
+  .settings(name := "facade-shadertoy", libraryDependencies += "org.scala-js" %% "scalajs-dom" % "2.8.1")
+
+lazy val threeFacade = (project in file("facades/three"))
+  .enablePlugins(ScalaJSPlugin)
+  .settings(name := "facade-three", libraryDependencies += "org.scala-js" %% "scalajs-dom" % "2.8.1")
+
+lazy val forcegraphFacade = (project in file("facades/forcegraph"))
+  .enablePlugins(ScalaJSPlugin)
+  .settings(name := "facade-forcegraph", libraryDependencies += "org.scala-js" %% "scalajs-dom" % "2.8.1")
+
+lazy val pdfjsFacade = (project in file("facades/pdfjs"))
+  .enablePlugins(ScalaJSPlugin)
+  .settings(name := "facade-pdfjs", libraryDependencies += "org.scala-js" %% "scalajs-dom" % "2.8.1")
+
 /** Types an example's server and View share (JVM and JS): one definition for
   * the output schema, the encoder and the View's decoder.
   */
@@ -61,11 +81,14 @@ def model(id: String, dir: String) =
 
 /** An example's View: Scala.js on iron-mcp-apps-view, bundled by esbuild (ViewBundlePlugin). */
 def view(id: String, dir: String): Project =
-  Project(s"${id}View", file(s"examples/$dir/view"))
+  viewAt(id, dir, file(s"examples/$dir/view"))
+
+def viewAt(id: String, projName: String, base: File): Project =
+  Project(s"${id}View", base)
     .enablePlugins(ViewBundlePlugin)
     .dependsOn(viewKit)
     .settings(
-      name := s"$dir-view",
+      name := s"$projName-view",
       libraryDependencies ++= Seq("io.github.danbills" %% "iron-mcp-apps-view" % ironMcpVersion) ++ testDeps
     )
 
@@ -145,13 +168,53 @@ lazy val qrView            = view("qr", "qr-server")
 lazy val qrServer          = server("qr", "qr-server", qrView).settings(
   libraryDependencies ++= Seq("com.google.zxing" % "core" % "3.5.3", "com.google.zxing" % "javase" % "3.5.3" % Test)
 )
+lazy val transcriptView    = view("transcript", "transcript-server").dependsOn(webspeech)
+lazy val transcriptServer  = server("transcript", "transcript-server", transcriptView)
+lazy val lazyAuthButtonView = viewAt("lazyAuthButton", "lazy-auth-button", file("examples/lazy-auth-server/button-view"))
+lazy val lazyAuthSecretView = viewAt("lazyAuthSecret", "lazy-auth-secret", file("examples/lazy-auth-server/secret-view"))
+lazy val lazyAuthServer     = server("lazyAuth", "lazy-auth-server", lazyAuthButtonView, lazyAuthSecretView).settings(
+  libraryDependencies ++= Seq(
+    "io.github.danbills" %% "iron-mcp-auth"        % ironMcpVersion,
+    "org.http4s"         %% "http4s-ember-client" % http4sVersion
+  )
+)
 lazy val videoView         = view("video", "video-resource-server")
 lazy val videoServer       = server("video", "video-resource-server", videoView)
+lazy val sayView           = view("say", "say-server")
+lazy val sayServer         = server("say", "say-server", sayView).settings(
+  libraryDependencies += "org.http4s" %% "http4s-ember-client" % http4sVersion
+)
+lazy val shadertoyView     = view("shadertoy", "shadertoy-server")
+  .dependsOn(shadertoyFacade)
+  .settings(
+    viewAliases += "shadertoy-lite" -> ((LocalRootProject / baseDirectory).value / "facades" / "shadertoy" / "vendor" / "ShaderToyLite.js").getAbsolutePath
+  )
+lazy val shadertoyServer   = server("shadertoy", "shadertoy-server", shadertoyView)
+lazy val threeView       = view("three", "threejs-server").dependsOn(threeFacade)
+lazy val threeServer     = server("three", "threejs-server", threeView)
+lazy val wikiModel       = model("wiki", "wiki-explorer-server")
+lazy val wikiView        = view("wiki", "wiki-explorer-server").dependsOn(wikiModel.js, forcegraphFacade)
+lazy val wikiServer      = server("wiki", "wiki-explorer-server", wikiView).dependsOn(wikiModel.jvm).settings(
+  libraryDependencies ++= Seq(
+    "org.jsoup"  % "jsoup"               % "1.18.3",
+    "org.http4s" %% "http4s-ember-client" % http4sVersion
+  )
+)
+lazy val mapModel         = model("map", "map-server")
+lazy val mapView          = view("map", "map-server").dependsOn(mapModel.js)
+lazy val mapServer        = server("map", "map-server", mapView).dependsOn(mapModel.jvm).settings(
+  libraryDependencies += "org.http4s" %% "http4s-ember-client" % http4sVersion
+)
+lazy val pdfModel         = model("pdf", "pdf-server")
+lazy val pdfView          = view("pdf", "pdf-server").dependsOn(pdfModel.js, pdfjsFacade)
+lazy val pdfServer        = server("pdf", "pdf-server", pdfView).dependsOn(pdfModel.jvm).settings(
+  libraryDependencies += "org.http4s" %% "http4s-ember-client" % http4sVersion
+)
 
-lazy val exampleServers = Seq(basicServer, budgetServer, cohortServer, segmentationServer, debugServer, scenarioServer, monitorServer, sheetMusicServer, integrationServer, qrServer, quickstartServer, videoServer)
-lazy val exampleViews   = Seq(basicView, budgetView, cohortView, segmentationView, debugView, scenarioView, monitorView, sheetMusicView, integrationView, qrView, quickstartView, videoView)
-lazy val facades: Seq[ProjectReference] = Seq(chartjs, abcjs)
-lazy val models: Seq[ProjectReference]  = Seq(budgetModel.jvm, budgetModel.js, cohortModel.jvm, cohortModel.js, segmentationModel.jvm, segmentationModel.js, scenarioModel.jvm, scenarioModel.js, monitorModel.jvm, monitorModel.js)
+lazy val exampleServers = Seq(basicServer, budgetServer, cohortServer, segmentationServer, debugServer, scenarioServer, monitorServer, sheetMusicServer, transcriptServer, lazyAuthServer, integrationServer, qrServer, quickstartServer, videoServer, sayServer, shadertoyServer, threeServer, wikiServer, mapServer, pdfServer)
+lazy val exampleViews   = Seq(basicView, budgetView, cohortView, segmentationView, debugView, scenarioView, monitorView, sheetMusicView, transcriptView, lazyAuthButtonView, lazyAuthSecretView, integrationView, qrView, quickstartView, videoView, sayView, shadertoyView, threeView, wikiView, mapView, pdfView)
+lazy val facades: Seq[ProjectReference] = Seq(chartjs, abcjs, webspeech, shadertoyFacade, threeFacade, forcegraphFacade, pdfjsFacade)
+lazy val models: Seq[ProjectReference]  = Seq(budgetModel.jvm, budgetModel.js, cohortModel.jvm, cohortModel.js, segmentationModel.jvm, segmentationModel.js, scenarioModel.jvm, scenarioModel.js, monitorModel.jvm, monitorModel.js, wikiModel.jvm, wikiModel.js, mapModel.jvm, mapModel.js, pdfModel.jvm, pdfModel.js)
 lazy val examples: Seq[ProjectReference] = (exampleServers ++ exampleViews).map(p => p: ProjectReference) ++ facades ++ models
 
 // Every server in one JVM, as upstream's run-all.ts does, for basic-host and the e2e suite.
@@ -165,4 +228,4 @@ lazy val runAll = (project in file("examples/run-all"))
 
 lazy val root = (project in file("."))
   .aggregate((Seq[ProjectReference](shared, viewKit, runAll) ++ examples)*)
-  .settings(name := "iron-mcp-ext-apps")
+  .settings(name := "iron-mcp-apps")

@@ -23,4 +23,8 @@ object ExampleServer:
   /** The server over Streamable HTTP on loopback. */
   def http(server: ServerHandler[IO], port: Int): Resource[IO, Server] =
     val routes = McpHttp.routes(server, McpHttp.Config(cors = true))
+    httpRoutes(routes, port)
+
+  /** Custom HTTP routes (e.g. auth-protected or metadata-enhanced) over loopback. */
+  def httpRoutes(routes: org.http4s.HttpRoutes[IO], port: Int): Resource[IO, Server] =
     McpHttp.serve(routes, port.refineEither[Interval.Closed[1, 65535]].fold(error => sys.error(s"not a port: $port ($error)"), identity))

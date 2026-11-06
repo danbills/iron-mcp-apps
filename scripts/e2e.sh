@@ -14,7 +14,7 @@ logs="$root/e2e/results"
 mkdir -p "$logs"
 
 pids=()
-cleanup() { for pid in "${pids[@]}"; do kill "$pid" 2>/dev/null || true; done; wait 2>/dev/null || true; }
+cleanup() { for pid in "${pids[@]}"; do kill "$pid" 2>/dev/null || true; done; sleep 0.5; for pid in "${pids[@]}"; do kill -9 "$pid" 2>/dev/null || true; done; wait 2>/dev/null || true; }
 trap cleanup EXIT
 
 if ss -ltn | grep -qE ':(8080|8081|8095) '; then

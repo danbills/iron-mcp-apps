@@ -1,5 +1,5 @@
 {
-  "name": "iron-mcp-ext-apps",
+  "name": "iron-mcp-apps",
   "private": true,
   "description": "JS libraries the Scala.js Views import (@JSImport), and esbuild, which bundles them. See adr/0001.",
   "devDependencies": {
