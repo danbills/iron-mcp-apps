@@ -1,0 +1,486 @@
+{
+ "2026-11-06": [
+  {
+   "month": "2024-12",
+   "allocations": {
+    "marketing": 24.5,
+    "engineering": 34.1,
+    "operations": 15.8,
+    "sales": 15.2,
+    "rd": 10.5
+   }
+  },
+  {
+   "month": "2025-01",
+   "allocations": {
+    "marketing": 26.4,
+    "engineering": 35.9,
+    "operations": 14.4,
+    "sales": 14.1,
+    "rd": 9.2
+   }
+  },
+  {
+   "month": "2025-02",
+   "allocations": {
+    "marketing": 24.3,
+    "engineering": 35.7,
+    "operations": 15.5,
+    "sales": 15.4,
+    "rd": 9.1
+   }
+  },
+  {
+   "month": "2025-03",
+   "allocations": {
+    "marketing": 24.4,
+    "engineering": 33.1,
+    "operations": 16.1,
+    "sales": 16.1,
+    "rd": 10.3
+   }
+  },
+  {
+   "month": "2025-04",
+   "allocations": {
+    "marketing": 25.5,
+    "engineering": 34.1,
+    "operations": 16.3,
+    "sales": 14,
+    "rd": 10.1
+   }
+  },
+  {
+   "month": "2025-05",
+   "allocations": {
+    "marketing": 26.8,
+    "engineering": 35,
+    "operations": 13.9,
+    "sales": 14.7,
+    "rd": 9.4
+   }
+  },
+  {
+   "month": "2025-06",
+   "allocations": {
+    "marketing": 25,
+    "engineering": 34.4,
+    "operations": 15.6,
+    "sales": 16.6,
+    "rd": 8.4
+   }
+  },
+  {
+   "month": "2025-07",
+   "allocations": {
+    "marketing": 26.3,
+    "engineering": 33,
+    "operations": 15.7,
+    "sales": 15.8,
+    "rd": 9.2
+   }
+  },
+  {
+   "month": "2025-08",
+   "allocations": {
+    "marketing": 26.1,
+    "engineering": 34.3,
+    "operations": 15.9,
+    "sales": 14.4,
+    "rd": 9.3
+   }
+  },
+  {
+   "month": "2025-09",
+   "allocations": {
+    "marketing": 26,
+    "engineering": 35.2,
+    "operations": 14.3,
+    "sales": 16.7,
+    "rd": 7.7
+   }
+  },
+  {
+   "month": "2025-10",
+   "allocations": {
+    "marketing": 25.7,
+    "engineering": 34.9,
+    "operations": 14.5,
+    "sales": 15.2,
+    "rd": 9.8
+   }
+  },
+  {
+   "month": "2025-11",
+   "allocations": {
+    "marketing": 25.9,
+    "engineering": 33.4,
+    "operations": 15.9,
+    "sales": 16.6,
+    "rd": 8.3
+   }
+  },
+  {
+   "month": "2025-12",
+   "allocations": {
+    "marketing": 27.8,
+    "engineering": 34.2,
+    "operations": 16,
+    "sales": 14.8,
+    "rd": 7.2
+   }
+  },
+  {
+   "month": "2026-01",
+   "allocations": {
+    "marketing": 25.3,
+    "engineering": 34.4,
+    "operations": 16.8,
+    "sales": 15,
+    "rd": 8.5
+   }
+  },
+  {
+   "month": "2026-02",
+   "allocations": {
+    "marketing": 27.6,
+    "engineering": 35.1,
+    "operations": 15.1,
+    "sales": 15.4,
+    "rd": 6.7
+   }
+  },
+  {
+   "month": "2026-03",
+   "allocations": {
+    "marketing": 26.7,
+    "engineering": 33.4,
+    "operations": 17.1,
+    "sales": 15.9,
+    "rd": 6.9
+   }
+  },
+  {
+   "month": "2026-04",
+   "allocations": {
+    "marketing": 27.2,
+    "engineering": 34.1,
+    "operations": 15.7,
+    "sales": 15,
+    "rd": 8
+   }
+  },
+  {
+   "month": "2026-05",
+   "allocations": {
+    "marketing": 27.2,
+    "engineering": 34.1,
+    "operations": 14.8,
+    "sales": 16.8,
+    "rd": 7
+   }
+  },
+  {
+   "month": "2026-06",
+   "allocations": {
+    "marketing": 28.5,
+    "engineering": 33.6,
+    "operations": 15.8,
+    "sales": 16.2,
+    "rd": 6
+   }
+  },
+  {
+   "month": "2026-07",
+   "allocations": {
+    "marketing": 26.7,
+    "engineering": 32.9,
+    "operations": 16.2,
+    "sales": 16.1,
+    "rd": 8.1
+   }
+  },
+  {
+   "month": "2026-08",
+   "allocations": {
+    "marketing": 28.5,
+    "engineering": 32.7,
+    "operations": 14.6,
+    "sales": 17.7,
+    "rd": 6.5
+   }
+  },
+  {
+   "month": "2026-09",
+   "allocations": {
+    "marketing": 28.6,
+    "engineering": 31.9,
+    "operations": 14.9,
+    "sales": 17.8,
+    "rd": 6.8
+   }
+  },
+  {
+   "month": "2026-10",
+   "allocations": {
+    "marketing": 27.7,
+    "engineering": 33.1,
+    "operations": 16.2,
+    "sales": 17.5,
+    "rd": 5.5
+   }
+  },
+  {
+   "month": "2026-11",
+   "allocations": {
+    "marketing": 27.8,
+    "engineering": 33.2,
+    "operations": 15.1,
+    "sales": 18.4,
+    "rd": 5.5
+   }
+  }
+ ],
+ "2026-03-31": [
+  {
+   "month": "2024-05",
+   "allocations": {
+    "marketing": 24.5,
+    "engineering": 34.1,
+    "operations": 15.8,
+    "sales": 15.2,
+    "rd": 10.5
+   }
+  },
+  {
+   "month": "2024-05",
+   "allocations": {
+    "marketing": 26.4,
+    "engineering": 35.9,
+    "operations": 14.4,
+    "sales": 14.1,
+    "rd": 9.2
+   }
+  },
+  {
+   "month": "2024-07",
+   "allocations": {
+    "marketing": 24.3,
+    "engineering": 35.7,
+    "operations": 15.5,
+    "sales": 15.4,
+    "rd": 9.1
+   }
+  },
+  {
+   "month": "2024-07",
+   "allocations": {
+    "marketing": 24.4,
+    "engineering": 33.1,
+    "operations": 16.1,
+    "sales": 16.1,
+    "rd": 10.3
+   }
+  },
+  {
+   "month": "2024-08",
+   "allocations": {
+    "marketing": 25.5,
+    "engineering": 34.1,
+    "operations": 16.3,
+    "sales": 14,
+    "rd": 10.1
+   }
+  },
+  {
+   "month": "2024-10",
+   "allocations": {
+    "marketing": 26.8,
+    "engineering": 35,
+    "operations": 13.9,
+    "sales": 14.7,
+    "rd": 9.4
+   }
+  },
+  {
+   "month": "2024-10",
+   "allocations": {
+    "marketing": 25,
+    "engineering": 34.4,
+    "operations": 15.6,
+    "sales": 16.6,
+    "rd": 8.4
+   }
+  },
+  {
+   "month": "2024-12",
+   "allocations": {
+    "marketing": 26.3,
+    "engineering": 33,
+    "operations": 15.7,
+    "sales": 15.8,
+    "rd": 9.2
+   }
+  },
+  {
+   "month": "2024-12",
+   "allocations": {
+    "marketing": 26.1,
+    "engineering": 34.3,
+    "operations": 15.9,
+    "sales": 14.4,
+    "rd": 9.3
+   }
+  },
+  {
+   "month": "2025-01",
+   "allocations": {
+    "marketing": 26,
+    "engineering": 35.2,
+    "operations": 14.3,
+    "sales": 16.7,
+    "rd": 7.7
+   }
+  },
+  {
+   "month": "2025-03",
+   "allocations": {
+    "marketing": 25.7,
+    "engineering": 34.9,
+    "operations": 14.5,
+    "sales": 15.2,
+    "rd": 9.8
+   }
+  },
+  {
+   "month": "2025-03",
+   "allocations": {
+    "marketing": 25.9,
+    "engineering": 33.4,
+    "operations": 15.9,
+    "sales": 16.6,
+    "rd": 8.3
+   }
+  },
+  {
+   "month": "2025-05",
+   "allocations": {
+    "marketing": 27.8,
+    "engineering": 34.2,
+    "operations": 16,
+    "sales": 14.8,
+    "rd": 7.2
+   }
+  },
+  {
+   "month": "2025-05",
+   "allocations": {
+    "marketing": 25.3,
+    "engineering": 34.4,
+    "operations": 16.8,
+    "sales": 15,
+    "rd": 8.5
+   }
+  },
+  {
+   "month": "2025-07",
+   "allocations": {
+    "marketing": 27.6,
+    "engineering": 35.1,
+    "operations": 15.1,
+    "sales": 15.4,
+    "rd": 6.7
+   }
+  },
+  {
+   "month": "2025-07",
+   "allocations": {
+    "marketing": 26.7,
+    "engineering": 33.4,
+    "operations": 17.1,
+    "sales": 15.9,
+    "rd": 6.9
+   }
+  },
+  {
+   "month": "2025-08",
+   "allocations": {
+    "marketing": 27.2,
+    "engineering": 34.1,
+    "operations": 15.7,
+    "sales": 15,
+    "rd": 8
+   }
+  },
+  {
+   "month": "2025-10",
+   "allocations": {
+    "marketing": 27.2,
+    "engineering": 34.1,
+    "operations": 14.8,
+    "sales": 16.8,
+    "rd": 7
+   }
+  },
+  {
+   "month": "2025-10",
+   "allocations": {
+    "marketing": 28.5,
+    "engineering": 33.6,
+    "operations": 15.8,
+    "sales": 16.2,
+    "rd": 6
+   }
+  },
+  {
+   "month": "2025-12",
+   "allocations": {
+    "marketing": 26.7,
+    "engineering": 32.9,
+    "operations": 16.2,
+    "sales": 16.1,
+    "rd": 8.1
+   }
+  },
+  {
+   "month": "2025-12",
+   "allocations": {
+    "marketing": 28.5,
+    "engineering": 32.7,
+    "operations": 14.6,
+    "sales": 17.7,
+    "rd": 6.5
+   }
+  },
+  {
+   "month": "2026-01",
+   "allocations": {
+    "marketing": 28.6,
+    "engineering": 31.9,
+    "operations": 14.9,
+    "sales": 17.8,
+    "rd": 6.8
+   }
+  },
+  {
+   "month": "2026-03",
+   "allocations": {
+    "marketing": 27.7,
+    "engineering": 33.1,
+    "operations": 16.2,
+    "sales": 17.5,
+    "rd": 5.5
+   }
+  },
+  {
+   "month": "2026-03",
+   "allocations": {
+    "marketing": 27.8,
+    "engineering": 33.2,
+    "operations": 15.1,
+    "sales": 18.4,
+    "rd": 5.5
+   }
+  }
+ ]
+}

@@ -40,6 +40,21 @@ lazy val viewKit = (project in file("examples/view-kit"))
     libraryDependencies ++= Seq("io.github.danbills" %% "iron-mcp-apps-view" % ironMcpVersion)
   )
 
+// Scala.js facades for the JS libraries the Views use (adr/0001): typed, and
+// only as much of each library as the Views need.
+lazy val chartjs = (project in file("facades/chartjs"))
+  .enablePlugins(ScalaJSPlugin)
+  .settings(name := "facade-chartjs", libraryDependencies += "org.scala-js" %% "scalajs-dom" % "2.8.1")
+
+/** Types an example's server and View share (JVM and JS): one definition for
+  * the output schema, the encoder and the View's decoder.
+  */
+def model(id: String, dir: String) =
+  sbtcrossproject.CrossProject(s"${id}Model", file(s"examples/$dir/model"))(JVMPlatform, JSPlatform)
+    .crossType(CrossType.Pure)
+    .withoutSuffixFor(JVMPlatform)
+    .settings(name := s"$dir-model", libraryDependencies += "io.github.danbills" %% "iron-mcp-protocol" % ironMcpVersion)
+
 /** An example's View: Scala.js on iron-mcp-apps-view, bundled by esbuild (ViewBundlePlugin). */
 def view(id: String, dir: String): Project =
   Project(s"${id}View", file(s"examples/$dir/view"))
@@ -80,6 +95,9 @@ def server(id: String, dir: String, views: Project*): Project =
 
 lazy val basicView        = view("basic", "basic-server")
 lazy val basicServer      = server("basic", "basic-server", basicView)
+lazy val budgetModel       = model("budget", "budget-allocator-server")
+lazy val budgetView        = view("budget", "budget-allocator-server").dependsOn(budgetModel.js, chartjs)
+lazy val budgetServer      = server("budget", "budget-allocator-server", budgetView).dependsOn(budgetModel.jvm)
 lazy val debugView         = view("debug", "debug-server")
 lazy val debugServer       = server("debug", "debug-server", debugView)
 lazy val integrationView   = view("integration", "integration-server")
@@ -94,9 +112,11 @@ lazy val qrServer          = server("qr", "qr-server", qrView).settings(
 lazy val videoView         = view("video", "video-resource-server")
 lazy val videoServer       = server("video", "video-resource-server", videoView)
 
-lazy val exampleServers = Seq(basicServer, debugServer, integrationServer, qrServer, quickstartServer, videoServer)
-lazy val exampleViews   = Seq(basicView, debugView, integrationView, qrView, quickstartView, videoView)
-lazy val examples: Seq[ProjectReference] = (exampleServers ++ exampleViews).map(p => p: ProjectReference)
+lazy val exampleServers = Seq(basicServer, budgetServer, debugServer, integrationServer, qrServer, quickstartServer, videoServer)
+lazy val exampleViews   = Seq(basicView, budgetView, debugView, integrationView, qrView, quickstartView, videoView)
+lazy val facades: Seq[ProjectReference] = Seq(chartjs)
+lazy val models: Seq[ProjectReference]  = Seq(budgetModel.jvm, budgetModel.js)
+lazy val examples: Seq[ProjectReference] = (exampleServers ++ exampleViews).map(p => p: ProjectReference) ++ facades ++ models
 
 // Every server in one JVM, as upstream's run-all.ts does, for basic-host and the e2e suite.
 lazy val runAll = (project in file("examples/run-all"))

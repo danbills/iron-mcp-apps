@@ -17,8 +17,8 @@ pids=()
 cleanup() { for pid in "${pids[@]}"; do kill "$pid" 2>/dev/null || true; done; wait 2>/dev/null || true; }
 trap cleanup EXIT
 
-if ss -ltn | grep -qE ':(8080|8081) '; then
-  echo "ports 8080/8081 are taken: stop the other basic-host first" >&2
+if ss -ltn | grep -qE ':(8080|8081|8095) '; then
+  echo "ports 8080/8081/8095 are taken: stop the other basic-host or harness first" >&2
   exit 1
 fi
 
@@ -39,6 +39,18 @@ for _ in $(seq 1 120); do
   curl -s -o /dev/null http://localhost:8080 && break
   sleep 1
 done
+
+# The test host for our specs (e2e/host): AppBridge, bundled from ext-apps'
+# build, served on :8095, with the examples' URLs by name.
+host="$root/e2e/host"
+mkdir -p "$host/dist"
+cp "$host/index.html" "$host/dist/index.html"
+NODE_PATH="$ext/node_modules" "$root/node_modules/.bin/esbuild" "$host/host.ts" --bundle --format=esm \
+  --outfile="$host/dist/host.js" --log-level=warning
+grep -E '^[a-z0-9-]+: http' "$logs/servers.log" \
+  | python3 -c 'import sys, json; print(json.dumps(dict(l.strip().split(": ", 1) for l in sys.stdin)))' > "$host/dist/servers.json"
+python3 -m http.server 8095 --bind 127.0.0.1 --directory "$host/dist" > "$logs/harness.log" 2>&1 &
+pids+=($!)
 
 # Our specs import @playwright/test; resolve it to ext-apps' copy, the one
 # that loads the config, or Playwright refuses to run.
