@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <title>Say View</title>
+</head>
+<body>
+  <main class="container" id="main-container" tabindex="0">
+    <div class="textWrapper">
+      <div class="textDisplay" id="text-display">
+        <span class="spoken" id="text-spoken"></span><span class="pending" id="text-pending"></span>
+      </div>
+    </div>
+    <!-- Toolbar - top right -->
+    <div class="toolbar">
+      <button class="controlBtn" id="play-pause-btn" title="Play/Pause">
+        <svg id="icon-play" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+        <svg id="icon-pause" viewBox="0 0 24 24" fill="currentColor" style="display: none;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+        <svg id="icon-restart-state" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      </button>
+      <button class="controlBtn" id="restart-btn" title="Restart">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+          <path d="M3 3v5h5"/>
+        </svg>
+      </button>
+      <button class="controlBtn fullscreenBtn" id="fullscreen-btn" title="Toggle fullscreen">
+        <svg class="expandIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+        </svg>
+        <svg class="collapseIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>
+        </svg>
+      </button>
+    </div>
+    <!-- Info button - bottom right -->
+    <button class="infoBtn" id="info-btn" title="Attribution info">i</button>
+    <div class="infoPopup" id="info-popup" style="display: none;">
+      <h4>Powered by Pocket TTS</h4>
+      <ul>
+        <li><a id="link-repo">Pocket TTS Repository</a> (Apache 2.0)</li>
+        <li><a id="link-model">Pocket TTS Model</a> (CC BY 4.0)</li>
+        <li><a id="link-voices">Voice Samples</a> (CC BY 4.0)</li>
+      </ul>
+    </div>
+  </main>
+  <!-- mcp-app-script -->
+</body>
+</html>
