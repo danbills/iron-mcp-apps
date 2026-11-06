@@ -1,7 +1,6 @@
 val scala3Version = "3.9.0"
-// From ~/iron-mcp branch feat/auth-hardening, published locally (sbt publishLocal);
-// set back to a release version once that is on Maven Central.
-val ironMcpVersion = "0.5.0+4-7afb3f93"
+// Published from ~/iron-mcp (v0.6.0).
+val ironMcpVersion = "0.6.0"
 val http4sVersion  = "0.23.37"
 
 ThisBuild / scalaVersion := scala3Version
