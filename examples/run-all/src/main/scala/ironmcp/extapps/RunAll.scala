@@ -16,6 +16,7 @@ object RunAll extends IOApp.Simple:
     "basic-server"       -> basic.BasicServer.load,
     "budget-allocator-server" -> budget.BudgetServer.load,
     "cohort-heatmap-server"   -> cohort.CohortServer.load,
+    "customer-segmentation-server" -> segmentation.SegmentationServer.load,
     "debug-server"       -> debug.DebugServer.load(Nil),
     "integration-server" -> integration.IntegrationServer.load,
     "qr-server"          -> qr.QrServer.load,
