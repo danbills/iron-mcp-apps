@@ -16,6 +16,7 @@ object RunAll extends IOApp.Simple:
     "basic-server"       -> basic.BasicServer.load,
     "debug-server"       -> debug.DebugServer.load(Nil),
     "integration-server" -> integration.IntegrationServer.load,
+    "qr-server"          -> qr.QrServer.load,
     "quickstart"   -> quickstart.QuickstartServer.load,
     "video-resource-server" -> video.VideoServer.load
   )

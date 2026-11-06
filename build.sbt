@@ -87,11 +87,15 @@ lazy val integrationServer = server("integration", "integration-server", integra
 lazy val quickstartView   = view("quickstart", "quickstart")
 lazy val quickstartServer = server("quickstart", "quickstart", quickstartView)
 
+lazy val qrView            = view("qr", "qr-server")
+lazy val qrServer          = server("qr", "qr-server", qrView).settings(
+  libraryDependencies ++= Seq("com.google.zxing" % "core" % "3.5.3", "com.google.zxing" % "javase" % "3.5.3" % Test)
+)
 lazy val videoView         = view("video", "video-resource-server")
 lazy val videoServer       = server("video", "video-resource-server", videoView)
 
-lazy val exampleServers = Seq(basicServer, debugServer, integrationServer, quickstartServer, videoServer)
-lazy val exampleViews   = Seq(basicView, debugView, integrationView, quickstartView, videoView)
+lazy val exampleServers = Seq(basicServer, debugServer, integrationServer, qrServer, quickstartServer, videoServer)
+lazy val exampleViews   = Seq(basicView, debugView, integrationView, qrView, quickstartView, videoView)
 lazy val examples: Seq[ProjectReference] = (exampleServers ++ exampleViews).map(p => p: ProjectReference)
 
 // Every server in one JVM, as upstream's run-all.ts does, for basic-host and the e2e suite.
