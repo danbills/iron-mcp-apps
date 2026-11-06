@@ -1,9 +1,9 @@
 package ironmcp.extapps.quickstart
 
-import cats.effect.{ExitCode, IO, IOApp}
+import cats.effect.IO
 import io.github.iltotore.iron.autoRefine
 import ironmcp.apps.*
-import ironmcp.extapps.{ExampleServer, JsDate, NoArgs, ViewPage}
+import ironmcp.extapps.{ExampleMain, JsDate, NoArgs, ViewPage}
 import ironmcp.protocol.*
 import ironmcp.server.*
 
@@ -26,6 +26,4 @@ object QuickstartServer:
 
   def load: IO[McpServer[IO]] = ViewPage.load("quickstart/view").map(apply)
 
-object Main extends IOApp:
-  def run(args: List[String]): IO[ExitCode] =
-    QuickstartServer.load.flatMap(ExampleServer.main(args, _, "quickstart"))
+object Main extends ExampleMain("quickstart", QuickstartServer.load)

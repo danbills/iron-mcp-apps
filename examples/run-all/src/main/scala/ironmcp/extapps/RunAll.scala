@@ -13,7 +13,8 @@ import ironmcp.server.ServerHandler
 object RunAll extends IOApp.Simple:
 
   private val examples: List[(String, IO[ServerHandler[IO]])] = List(
-    "quickstart" -> quickstart.QuickstartServer.load
+    "basic-server" -> basic.BasicServer.load,
+    "quickstart"   -> quickstart.QuickstartServer.load
   )
 
   def run: IO[Unit] =

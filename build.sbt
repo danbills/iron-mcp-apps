@@ -31,10 +31,20 @@ lazy val shared = (project in file("examples/shared"))
     ) ++ testDeps
   )
 
+// What every example View shares (Scala.js): connecting as ext-apps' App does
+// by default, and the DOM-to-IO bridge.
+lazy val viewKit = (project in file("examples/view-kit"))
+  .enablePlugins(ScalaJSPlugin)
+  .settings(
+    name := "ext-apps-view-kit",
+    libraryDependencies ++= Seq("io.github.danbills" %% "iron-mcp-apps-view" % ironMcpVersion)
+  )
+
 /** An example's View: Scala.js on iron-mcp-apps-view, bundled by esbuild (ViewBundlePlugin). */
 def view(id: String, dir: String): Project =
   Project(s"${id}View", file(s"examples/$dir/view"))
     .enablePlugins(ViewBundlePlugin)
+    .dependsOn(viewKit)
     .settings(
       name := s"$dir-view",
       libraryDependencies ++= Seq("io.github.danbills" %% "iron-mcp-apps-view" % ironMcpVersion) ++ testDeps
@@ -68,12 +78,17 @@ def server(id: String, dir: String, views: Project*): Project =
       Compile / resourceGenerators += viewResources(views).taskValue
     )
 
+lazy val basicView        = view("basic", "basic-server")
+lazy val basicServer      = server("basic", "basic-server", basicView)
 lazy val quickstartView   = view("quickstart", "quickstart")
 lazy val quickstartServer = server("quickstart", "quickstart", quickstartView)
 
+lazy val examples: Seq[ProjectReference] = Seq(basicView, basicServer, quickstartView, quickstartServer)
+lazy val exampleServers = Seq(basicServer, quickstartServer)
+
 // Every server in one JVM, as upstream's run-all.ts does, for basic-host and the e2e suite.
 lazy val runAll = (project in file("examples/run-all"))
-  .dependsOn(quickstartServer)
+  .dependsOn(exampleServers.map(p => p: ClasspathDep[ProjectReference])*)
   .settings(
     name               := "ext-apps-run-all",
     run / fork         := true,
@@ -81,5 +96,5 @@ lazy val runAll = (project in file("examples/run-all"))
   )
 
 lazy val root = (project in file("."))
-  .aggregate(shared, quickstartView, quickstartServer, runAll)
+  .aggregate((Seq[ProjectReference](shared, viewKit, runAll) ++ examples)*)
   .settings(name := "iron-mcp-ext-apps")
