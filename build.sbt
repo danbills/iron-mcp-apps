@@ -98,6 +98,9 @@ lazy val basicServer      = server("basic", "basic-server", basicView)
 lazy val budgetModel       = model("budget", "budget-allocator-server")
 lazy val budgetView        = view("budget", "budget-allocator-server").dependsOn(budgetModel.js, chartjs)
 lazy val budgetServer      = server("budget", "budget-allocator-server", budgetView).dependsOn(budgetModel.jvm)
+lazy val cohortModel       = model("cohort", "cohort-heatmap-server")
+lazy val cohortView        = view("cohort", "cohort-heatmap-server").dependsOn(cohortModel.js)
+lazy val cohortServer      = server("cohort", "cohort-heatmap-server", cohortView).dependsOn(cohortModel.jvm)
 lazy val debugView         = view("debug", "debug-server")
 lazy val debugServer       = server("debug", "debug-server", debugView)
 lazy val integrationView   = view("integration", "integration-server")
@@ -112,10 +115,10 @@ lazy val qrServer          = server("qr", "qr-server", qrView).settings(
 lazy val videoView         = view("video", "video-resource-server")
 lazy val videoServer       = server("video", "video-resource-server", videoView)
 
-lazy val exampleServers = Seq(basicServer, budgetServer, debugServer, integrationServer, qrServer, quickstartServer, videoServer)
-lazy val exampleViews   = Seq(basicView, budgetView, debugView, integrationView, qrView, quickstartView, videoView)
+lazy val exampleServers = Seq(basicServer, budgetServer, cohortServer, debugServer, integrationServer, qrServer, quickstartServer, videoServer)
+lazy val exampleViews   = Seq(basicView, budgetView, cohortView, debugView, integrationView, qrView, quickstartView, videoView)
 lazy val facades: Seq[ProjectReference] = Seq(chartjs)
-lazy val models: Seq[ProjectReference]  = Seq(budgetModel.jvm, budgetModel.js)
+lazy val models: Seq[ProjectReference]  = Seq(budgetModel.jvm, budgetModel.js, cohortModel.jvm, cohortModel.js)
 lazy val examples: Seq[ProjectReference] = (exampleServers ++ exampleViews).map(p => p: ProjectReference) ++ facades ++ models
 
 // Every server in one JVM, as upstream's run-all.ts does, for basic-host and the e2e suite.

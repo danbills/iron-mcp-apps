@@ -4,11 +4,11 @@ import cats.Show
 import cats.effect.IO
 import io.github.iltotore.iron.autoRefine
 import ironmcp.apps.*
-import ironmcp.extapps.{ExampleMain, JsNumber, NoArgs, ViewPage}
+import ironmcp.extapps.{ExampleMain, JsDate, JsNumber, NoArgs, ViewPage}
 import ironmcp.protocol.*
 import ironmcp.server.*
 
-import java.time.{LocalDate, YearMonth}
+import java.time.LocalDate
 import scala.collection.immutable.ListMap
 
 /** Upstream's budget-allocator-server: budget configuration, 24 months of
@@ -54,17 +54,11 @@ object BudgetServer:
       state = (toInt32(state * 1103515245.0 + 12345.0) & 0x7fffffff).toDouble
       state / 0x7fffffff.toDouble
 
-  /** `date.setMonth(date.getMonth() - i)`: the day carries over, so the 31st
-    * of a 30-day month lands in the next one, as in JavaScript.
-    */
-  private def monthsBack(today: LocalDate, i: Int): YearMonth =
-    YearMonth.from(YearMonth.from(today).minusMonths(i.toLong).atDay(1).plusDays((today.getDayOfMonth - 1).toLong))
-
   /** 24 months of history, oldest first: default plus trend plus noise, normalised to 100%. */
   def history(today: LocalDate): List[HistoricalMonth] =
     val random = seededRandom(42)
     (23 to 0 by -1).toList.map { i =>
-      val ym  = monthsBack(today, i)
+      val ym  = JsDate.monthsBack(today, i)
       val raw = Categories.map { c =>
         val trend = (23 - i) * c.trendPerMonth
         val noise = (random() - 0.5) * 3

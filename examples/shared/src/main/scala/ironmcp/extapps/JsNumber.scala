@@ -9,6 +9,10 @@ object JsNumber:
   /** `String(n)`: `25`, not `25.0`. */
   def str(n: Double): String = if n.isWhole && math.abs(n) < 1e21 then n.toLong.toString else n.toString
 
+  /** `n.toFixed(digits)`: the exact binary value, halves away from zero. */
+  def fixed(n: Double, digits: Int): String =
+    java.math.BigDecimal(n).setScale(digits, java.math.RoundingMode.HALF_UP).toPlainString
+
   /** `n.toLocaleString()` in en-US, Node's default: `100,000`, at most three decimals. */
   def locale(n: Double): String =
     val format = NumberFormat.getNumberInstance(Locale.US)
