@@ -1,5 +1,6 @@
-// ext-apps' own end-to-end suite (tests/e2e/servers.spec.ts, unmodified),
-// run by ext-apps' Playwright against whatever servers basic-host lists.
+// ext-apps' own end-to-end suite (tests/e2e/servers.spec.ts, unmodified), and
+// ours (e2e/specs), run by ext-apps' Playwright against whatever servers
+// basic-host lists. `--project chromium` or `--project ports` runs one.
 //
 // Run from ~/ext-apps, so the spec and this config share one copy of
 // @playwright/test:
@@ -28,8 +29,6 @@ const snapshotPathTemplate =
     : join(here, "goldens", goldens, "{arg}{ext}");
 
 export default {
-  testDir: join(extApps, "tests/e2e"),
-  testMatch: ["servers.spec.ts"],
   fullyParallel: true,
   workers: Number(process.env.WORKERS ?? 6),
   timeout: 60000,
@@ -41,7 +40,22 @@ export default {
     trace: "off",
     screenshot: "only-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    // ext-apps' own suite, unmodified.
+    {
+      name: "chromium",
+      testDir: join(extApps, "tests/e2e"),
+      testMatch: ["servers.spec.ts"],
+      use: { ...devices["Desktop Chrome"] },
+    },
+    // Ours, for what upstream's suite does not cover (examples it leaves out,
+    // View tools, downloads). Same host, same helpers.
+    {
+      name: "ports",
+      testDir: join(here, "specs"),
+      use: { ...devices["Desktop Chrome"] },
+    },
+  ],
   expect: {
     toHaveScreenshot: { maxDiffPixelRatio: 0.06, animations: "disabled" },
   },

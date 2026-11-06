@@ -16,7 +16,8 @@ object RunAll extends IOApp.Simple:
     "basic-server"       -> basic.BasicServer.load,
     "debug-server"       -> debug.DebugServer.load(Nil),
     "integration-server" -> integration.IntegrationServer.load,
-    "quickstart"   -> quickstart.QuickstartServer.load
+    "quickstart"   -> quickstart.QuickstartServer.load,
+    "video-resource-server" -> video.VideoServer.load
   )
 
   def run: IO[Unit] =

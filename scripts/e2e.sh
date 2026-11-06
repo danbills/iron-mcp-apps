@@ -40,5 +40,10 @@ for _ in $(seq 1 120); do
   sleep 1
 done
 
+# Our specs import @playwright/test; resolve it to ext-apps' copy, the one
+# that loads the config, or Playwright refuses to run.
+mkdir -p "$root/e2e/node_modules"
+ln -sfn "$ext/node_modules/@playwright" "$root/e2e/node_modules/@playwright"
+
 cd "$ext"
 npx playwright test -c "$root/e2e/upstream.config.mjs" "$@"
