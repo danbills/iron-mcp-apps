@@ -22,6 +22,7 @@ object RunAll extends IOApp.Simple:
     "qr-server"          -> qr.QrServer.load,
     "scenario-modeler-server" -> scenario.ScenarioServer.load,
     "quickstart"   -> quickstart.QuickstartServer.load,
+    "system-monitor-server" -> monitor.MonitorServer.load,
     "video-resource-server" -> video.VideoServer.load
   )
 
