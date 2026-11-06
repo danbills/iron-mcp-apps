@@ -14,6 +14,7 @@ object RunAll extends IOApp.Simple:
 
   private val examples: List[(String, IO[ServerHandler[IO]])] = List(
     "basic-server"       -> basic.BasicServer.load,
+    "debug-server"       -> debug.DebugServer.load(Nil),
     "integration-server" -> integration.IntegrationServer.load,
     "quickstart"   -> quickstart.QuickstartServer.load
   )

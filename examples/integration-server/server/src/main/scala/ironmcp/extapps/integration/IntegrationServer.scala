@@ -54,4 +54,4 @@ object IntegrationServer:
 
   def load: IO[McpServer[IO]] = ViewPage.load("integration-server/view").map(apply)
 
-object Main extends ExampleMain("integration-server", IntegrationServer.load)
+object Main extends ExampleMain("integration-server", _ => IntegrationServer.load)

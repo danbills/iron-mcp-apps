@@ -26,4 +26,4 @@ object QuickstartServer:
 
   def load: IO[McpServer[IO]] = ViewPage.load("quickstart/view").map(apply)
 
-object Main extends ExampleMain("quickstart", QuickstartServer.load)
+object Main extends ExampleMain("quickstart", _ => QuickstartServer.load)

@@ -37,4 +37,4 @@ object BasicServer:
 
   def load: IO[McpServer[IO]] = ViewPage.load("basic-server/view").map(apply)
 
-object Main extends ExampleMain("basic-server", BasicServer.load)
+object Main extends ExampleMain("basic-server", _ => BasicServer.load)
