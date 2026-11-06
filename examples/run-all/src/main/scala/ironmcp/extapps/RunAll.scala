@@ -23,7 +23,7 @@ object RunAll extends IOApp.Simple:
     "customer-segmentation-server" -> std(segmentation.SegmentationServer.load),
     "debug-server"                 -> std(debug.DebugServer.load(Nil)),
     "integration-server"           -> std(integration.IntegrationServer.load),
-    "lazy-auth-server"             -> (port => lazyauth.LazyAuthServer.loadRoutes(s"http://localhost:$port/mcp").flatMap(ExampleServer.httpRoutes(_, port))),
+    "lazy-auth-server"             -> (port => lazyauth.LazyAuthServer.loadRoutes(ironmcp.auth.ResourceIdentity.unsafe(s"http://localhost:$port/mcp")).flatMap(ExampleServer.httpRoutes(_, port))),
     "map-server"                   -> std(map.MapServer.load),
     "pdf-server"                   -> std(pdf.PdfServer.load),
     "qr-server"                    -> std(qr.QrServer.load),

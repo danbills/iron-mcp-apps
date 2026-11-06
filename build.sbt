@@ -1,6 +1,6 @@
 val scala3Version = "3.9.0"
-// Published from ~/iron-mcp (v0.5.0).
-val ironMcpVersion = "0.5.0"
+// Published from ~/iron-mcp (v0.6.0).
+val ironMcpVersion = "0.6.0"
 val http4sVersion  = "0.23.37"
 
 ThisBuild / scalaVersion := scala3Version
