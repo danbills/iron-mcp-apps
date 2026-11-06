@@ -1,0 +1,10 @@
+iron-mcp-ext-apps ports the examples of the MCP Apps SDK
+(https://github.com/modelcontextprotocol/ext-apps) to Scala.
+
+Each View's HTML and CSS, and the data and behaviour of each example, follow
+the upstream example of the same name. Upstream's code is licensed under
+Apache-2.0 (contributions from authors who have not relicensed remain MIT);
+see https://github.com/modelcontextprotocol/ext-apps/blob/main/LICENSE.
+
+ShaderToyLite.js (examples/shadertoy-server) is Copyright (c) Chip Weinberger,
+MIT License: https://github.com/chipweinberger/ShaderToyLite.js

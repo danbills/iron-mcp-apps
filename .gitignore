@@ -1,0 +1,7 @@
+target/
+node_modules/
+.bsp/
+.metals/
+.bloop/
+e2e/results/
+e2e/goldens/scala-local/

@@ -1,0 +1,14 @@
+diff --git a/examples/basic-host/src/implementation.ts b/examples/basic-host/src/implementation.ts
+index 5f680ffd..702ba4ca 100644
+--- a/examples/basic-host/src/implementation.ts
++++ b/examples/basic-host/src/implementation.ts
+@@ -52,7 +52,8 @@ export async function connectToServer(serverUrl: URL): Promise<ServerInfo> {
+ async function connectWithFallback(serverUrl: URL): Promise<Client> {
+   // Try Streamable HTTP first (modern transport)
+   try {
+-    const client = new Client(IMPLEMENTATION);
++    // Probe server/discover (2026-07-28) first, falling back to initialize.
++    const client = new Client(IMPLEMENTATION, { versionNegotiation: { mode: "auto" } });
+     await client.connect(new StreamableHTTPClientTransport(serverUrl));
+     log.info("Connected via Streamable HTTP transport");
+     return client;

@@ -1,0 +1,17 @@
+{
+  "name": "iron-mcp-ext-apps",
+  "private": true,
+  "description": "JS libraries the Scala.js Views import (@JSImport), and esbuild, which bundles them. See adr/0001.",
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  },
+  "dependencies": {
+    "@cantoo/pdf-lib": "2.6.5",
+    "abcjs": "6.6.0",
+    "chart.js": "4.5.1",
+    "d3-force-3d": "3.0.6",
+    "force-graph": "1.51.0",
+    "pdfjs-dist": "5.4.530",
+    "three": "0.181.2"
+  }
+}
