@@ -1,4 +1,4 @@
-val scala3Version = "3.9.0"
+val scala3Version = "3.10.1"
 // Published from ~/iron-mcp (v0.6.0).
 val ironMcpVersion = "0.6.0"
 val http4sVersion  = "0.23.37"
@@ -11,7 +11,9 @@ ThisBuild / scalacOptions ++= Seq(
   "-unchecked",
   "-Wunused:all",
   "-Wvalue-discard",
-  "-Werror"
+  "-Werror",
+  "-Wconf:msg=ArrowAssoc.*is deprecated:s",
+  "-Wconf:id=E235:s"
 )
 
 val testDeps = Seq(
